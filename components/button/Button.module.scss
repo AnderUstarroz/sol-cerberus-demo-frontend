@@ -1,0 +1,30 @@
+.default {
+  cursor: pointer;
+  padding: 10px 20px;
+  font-size: var(--fontSizeSmall);
+  font-weight: bold;
+  border: 0;
+  border: none;
+  border-radius: var(--btnRadius);
+  box-shadow: var(--btnShadow);
+  display: flex;
+  align-items: center;
+  &:hover {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.15) 0 0);
+  }
+}
+.default:global {
+  &.active {
+  }
+}
+.default:global {
+  &.disabled {
+    cursor: no-drop;
+  }
+}
+
+@media (max-width: 768px) {
+  .default {
+    font-size: var(--mFontSize1);
+  }
+}

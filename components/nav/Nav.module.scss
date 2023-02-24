@@ -1,0 +1,29 @@
+.nav {
+  ul {
+    background: var(--navBg);
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px;
+    li {
+      margin-left: 32px;
+      display: flex;
+      align-items: center;
+    }
+  }
+  button,
+  a {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: var(--fontSizeSmall);
+    color: var(--colorFont3);
+    font-weight: bold;
+    > span {
+      margin-right: 7px !important;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .nav {
+    display: none;
+  }
+}

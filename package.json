@@ -6,8 +6,23 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
+    "@project-serum/anchor": "^0.26.0",
+    "@solana-mobile/wallet-adapter-mobile": "^1.0.0",
+    "@solana/wallet-adapter-base": "^0.9.21",
+    "@solana/wallet-adapter-react": "^0.15.29",
+    "@solana/wallet-adapter-react-ui": "^0.9.28",
+    "@solana/wallet-adapter-wallets": "^0.19.11",
+    "@solana/web3.js": "^1.73.2",
+    "framer-motion": "^9.0.4",
+    "next": "13.1.6",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-headroom": "^3.2.1",
+    "react-hot-toast": "^2.4.0",
+    "react-modal": "^3.16.1",
+    "sass": "^1.58.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.0.28"
   }
 }
