@@ -1,5 +1,4 @@
 html {
-
   --h1Size: 33px;
   --h2Size: 20px;
   --h3Size: 16px;
@@ -17,8 +16,11 @@ html {
   --mFontSizeMedium: 14px;
   --mFontSizeSmall: 12px;
 
-
   --fontColor: white;
-  --navBg: black;
+  --navBg: #403b39 url(../public/images/badlands/nav-bg.webp) repeat top left;
   --buttonBg0: #5538d0;
+
+  --fire: #ffff05;
+  --iconFill0: white;
+  --iconFill1: #e3be59;
 }

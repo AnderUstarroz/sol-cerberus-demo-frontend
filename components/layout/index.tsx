@@ -15,9 +15,8 @@ export default function Layout({ children }: any) {
   const router = useRouter();
   const [showLayout, setShowLayout] = useState(true);
 
-  // Hide layout only on Admin pages when wallet not connected
+  // Hide layout when wallet not connected
   useEffect(() => {
-    if (router.pathname.slice(0, 7) === "/admin/") {
       if (!publicKey) {
         if (showLayout) {
           setShowLayout(false);
@@ -27,7 +26,6 @@ export default function Layout({ children }: any) {
           setShowLayout(true);
         }
       }
-    }
   }, [publicKey, router]);
 
   return (

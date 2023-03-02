@@ -1,0 +1,55 @@
+// @import "../../styles/variables";
+
+.modal {
+  margin: 50px auto;
+  width: 400px;
+  max-width: 80%;
+  background: rgba(40, 37, 36, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: auto;
+  outline: none;
+  & :global {
+    .infoIco {
+      width: fit-content;
+      margin: 0 auto 15px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+      padding: 16px;
+      background-color: var(--iconFill1);
+    }
+  }
+}
+.modHead {
+  padding: 20px 20px 0 0;
+  button {
+    display: block;
+    margin-left: auto;
+    padding: 0;
+    background: none;
+    height: fit-content;
+    cursor: pointer;
+  }
+}
+.modBody {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 0 20px 20px 20px;
+  h3 {
+    font-size: var(--h4Size);
+    margin: 0 0 10px 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .modBody {
+    padding: 10px;
+  }
+  .modHead {
+    h3 {
+      font-size: 20px;
+    }
+  }
+}
