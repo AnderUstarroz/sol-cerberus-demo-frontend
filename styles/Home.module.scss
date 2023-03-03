@@ -77,7 +77,7 @@
   background-size: auto, auto, auto, auto, calc(100% - 82px) 50px,
     72px calc(100% - 62px), calc(100% - 82px) 50px, 50px calc(100% - 62px), auto,
     auto;
-  padding: 55px;
+  padding: 45px;
   display: flex;
   gap: 25px;
   flex-direction: row-reverse;
@@ -86,11 +86,22 @@
     width: 100%;
     display: flex;
     flex-direction: column;
+    gap: 25px;
   }
   & :global {
     .shape {
+      display: flex;
+      justify-content: center;
+      align-items: center;
       width: 100%;
-      min-height: 100px;
+      min-height: 200px;
+      span {
+        display: block;
+        width: 1px;
+        height: 1px;
+        transition: all 1s ease-in;
+        transform: scale(0) rotate(0turn);
+      }
     }
     .shapeBtns {
       width: 100%;

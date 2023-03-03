@@ -8,6 +8,7 @@ export interface SquareType extends ShapeType {}
 export interface CircleType extends ShapeType {}
 export interface TriangleType extends ShapeType {}
 
+export type ActionType = "Add" | "Update" | "Delete";
 export interface DemoType {
   authority: PublicKey;
   solCerberusApp: PublicKey;
@@ -39,6 +40,12 @@ export interface ErrorType {
   [k: string]: string;
 }
 
-export interface AddresssesByRoleType {
-  [role: string]: string[];
+export type ResourceType = "Square" | "Circle" | "Triangle";
+export interface ResourceDataType {
+  func: Function | null;
+  resource: ResourceType;
+  action: ActionType;
+  size: number;
+  color: string;
+  loading: boolean;
 }

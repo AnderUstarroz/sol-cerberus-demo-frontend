@@ -5,8 +5,11 @@ import {
   SOL_CERBERUS_PROGRAM_ID,
   sc_app_pda,
   sc_rule_pda,
+  sc_role_pda,
+  nft_metadata_pda,
 } from "sol-cerberus-js";
 import SolCerberusIDL from "sol-cerberus-js/lib/idl.json";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 export enum namespaces {
   Default = 0,
@@ -19,6 +22,7 @@ export interface PermsType {
   };
 }
 
+export type AddressType = "wallet" | "nft" | "collection";
 export interface ResourcesType {
   [resource: string]: PermsType;
 }
@@ -38,24 +42,35 @@ export interface CachedPermsType {
   perms: NamespacesType;
 }
 
+export interface AssignedRoleObjectType {
+  addressType: AddressType;
+  createdAt: number;
+  nftMint: PublicKey | null;
+  expiresAt: number | null;
+}
 export interface AssignedRolesType {
-  [role: string]: {
-    addressType: string;
-    createdAt: number;
-    expiresAt: number | null;
-  };
+  [role: string]: AssignedRoleObjectType;
 }
 
-export interface AddressAssignedRolesType {
+export interface RolesByAddressType {
   [address: string]: AssignedRolesType;
+}
+
+export interface AssignedAddressType {
+  [address: string]: AssignedRoleObjectType;
+}
+
+export interface AddressByRoleType {
+  [role: string]: AssignedAddressType;
 }
 
 export class SolCerberus {
   /** @internal */ #program: anchor.Program<SolCerberusType>;
-  /** @internal */ #appId: anchor.web3.PublicKey;
-  /** @internal */ #appPda: anchor.web3.PublicKey;
+  /** @internal */ #appId: PublicKey;
+  /** @internal */ #appPda: PublicKey;
   /** @internal */ #appData;
   /** @internal */ #permissions: CachedPermsType;
+  /** @internal */ #wallet: PublicKey;
 
   /**
    * Creates Sol Cerberus client
@@ -70,35 +85,40 @@ export class SolCerberus {
       SOL_CERBERUS_PROGRAM_ID,
       provider
     );
+    this.#wallet = provider.publicKey;
+    this.fetchAppData();
     this.refreshPerms();
   }
 
-  async fetchAppPda() {
+  async fetchAppPda(): Promise<PublicKey> {
     this.#appPda = await sc_app_pda(this.#appId);
     return this.#appPda;
   }
   async fetchAppData() {
-    this.#appData = await this.program.account.app.fetch(this.#appPda);
+    this.#appData = await this.program.account.app.fetch(
+      await this.getAppPda()
+    );
     return this.#appData;
   }
 
   get program() {
     return this.#program;
   }
+
   get appId() {
     return this.#appId;
   }
 
-  get appPda() {
-    return this.#appPda
-      ? this.#appPda
-      : (async () => await this.fetchAppPda())();
+  get wallet() {
+    return this.#wallet;
   }
 
-  get appData() {
-    return this.#appData
-      ? this.#appData
-      : (async () => await this.fetchAppData())();
+  async getAppPda(): Promise<PublicKey> {
+    return this.#appPda ? this.#appPda : await this.fetchAppPda();
+  }
+
+  async getAppData() {
+    return this.#appData ? this.#appData : await this.fetchAppData();
   }
 
   get permissions() {
@@ -117,26 +137,26 @@ export class SolCerberus {
   permsWildcards(resource, permission) {
     return [
       [resource, permission],
-      ["*", "*"],
-      ["*", permission],
       [resource, "*"],
+      ["*", permission],
+      ["*", "*"],
     ];
   }
 
   hasPerm(
-    roles: string[],
+    roles: AddressByRoleType,
     resource: string,
     permission: string,
     namespace: number = namespaces.Default
   ) {
-    for (const role of roles) {
-      for (const [res, perm] of this.permsWildcards(resource, permission)) {
-        if (this.hasRule(role, res, perm, namespace)) {
-          return true;
-        }
-      }
+    /**
+     * Returns True if the rule is positive for at least one of the provided roles.
+     */
+    // Authority has Full access:
+    if (this.#appData.authority.toBase58() === this.#wallet.toBase58()) {
+      return true;
     }
-    return false;
+    return !!this.findRule(roles, resource, permission, namespace);
   }
 
   hasRule(
@@ -154,39 +174,112 @@ export class SolCerberus {
     return false;
   }
 
-  async getRule(
-    roles: string[],
+  validAssignedAddress(addresses: AssignedAddressType): string {
+    /**
+     * Returns the first valid assigned address (not expired)
+     */
+    for (const address in addresses) {
+      if (
+        !addresses[address].expiresAt ||
+        addresses[address].expiresAt > new Date().getTime()
+      ) {
+        return address;
+      }
+    }
+    return null;
+  }
+
+  findRule(
+    roles: AddressByRoleType,
     resource: string,
     permission: string,
     namespace: number = namespaces.Default
-  ): Promise<PublicKey | null> {
-    for (const role of roles) {
-      for (const [res, perm] of this.permsWildcards(resource, permission)) {
-        if (this.hasRule(role, res, perm, namespace)) {
-          return await sc_rule_pda(this.appId, role, res, perm, namespace);
+  ): [string, string, string, number] | null {
+    /**
+     * Finds the first Rule definition matching the provided Role, Resource, Permission and namespace.
+     */
+    for (const role in roles) {
+      // Verify assigned role is not expired
+      if (this.validAssignedAddress(roles[role])) {
+        for (const [res, perm] of this.permsWildcards(resource, permission)) {
+          if (this.hasRule(role, res, perm, namespace)) {
+            return [role, res, perm, namespace];
+          }
         }
       }
     }
     return null;
   }
 
-  parseAddressType(addressType) {
-    return Object.keys(addressType)[0];
+  async getRulePda(
+    roles: AddressByRoleType,
+    resource: string,
+    permission: string,
+    namespace: number = namespaces.Default
+  ): Promise<PublicKey | null> {
+    try {
+      const rule = this.findRule(roles, resource, permission, namespace);
+      if (!rule) {
+        return null;
+      }
+      return await sc_rule_pda(this.appId, ...rule);
+    } catch (e) {}
+
+    return null;
   }
 
-  async assignedRoles(address: PublicKey): Promise<AssignedRolesType> {
-    let data = await this.allAssignedRoles([
-      {
-        memcmp: {
-          offset: 40, // Starting byte of the Address Pubkey
-          bytes: address.toBase58(), // Address as base58 encoded string
-        },
+  parseAddressType(addressType): AddressType {
+    return Object.keys(addressType)[0] as AddressType;
+  }
+
+  async assignedRoles(addresses: PublicKey[]): Promise<AddressByRoleType> {
+    /**
+     * Fetches the roles assigned to the provided addresses
+     */
+    return (await this.filterAssignedRoles(addresses)).reduce(
+      (output, x: RolesByAddressType) => {
+        Object.entries(x).map(([address, roles]) => {
+          Object.entries(roles).map(([role, values]) => {
+            if (!output[role]) {
+              output[role] = {};
+            }
+            output[role][address] = values;
+          });
+        });
+        return output;
       },
-    ]);
-    return Object.keys(data).length ? Object.values(data)[0] : {};
+      {}
+    );
   }
 
-  async allAssignedRoles(filters = []): Promise<AddressAssignedRolesType> {
+  async filterAssignedRoles(
+    addresses: PublicKey[]
+  ): Promise<RolesByAddressType[]> {
+    /**
+     * Fetches the roles assigned to the provided addresses
+     */
+    return (
+      await Promise.allSettled(
+        addresses.map((address: PublicKey) =>
+          this.fetchAssignedRoles([
+            {
+              memcmp: {
+                offset: 40, // Starting byte of the Address Pubkey
+                bytes: address.toBase58(), // Address as base58 encoded string
+              },
+            },
+          ])
+        )
+      )
+    )
+      .filter((r: any) => r.status === "fulfilled")
+      .map((r: any) => r.value);
+  }
+
+  async fetchAssignedRoles(filters = []): Promise<RolesByAddressType> {
+    /**
+     * Fetches all assigned roles for the current program
+     */
     return (
       await this.#program.account.role.all([
         {
@@ -202,13 +295,135 @@ export class SolCerberus {
         [data.account.role]: {
           addressType: this.parseAddressType(data.account.addressType),
           createdAt: data.account.createdAt.toNumber() * 1000,
+          nftMint: null,
           expiresAt: data.account.expiresAt
             ? data.account.expiresAt.toNumber() * 1000
             : null,
         },
       };
       return assignedRoles;
-    }, {} as AddressAssignedRolesType);
+    }, {} as RolesByAddressType);
+  }
+
+  async accounts(
+    roles: AddressByRoleType,
+    resource: string,
+    permission: string,
+    namespace: number = namespaces.Default
+  ): Promise<{}> {
+    /**
+     * Generates the required PDAs to perform the provided transaction:
+     *    - solCerberusApp: app PDA,
+     *    - solCerberusRule: rule PDA,
+     *    - solCerberusRole: role PDA,
+     *    - solCerberusTokenAcc: tokenAccount PDA,
+     *    - solCerberusMetadata: Metaplex PDA,
+     *    - solCerberus: Program PDA,
+     *
+     */
+    let defaultOutput = {
+      solCerberusApp: this.#appPda,
+      solCerberusRule: null,
+      solCerberusRole: null,
+      solCerberusTokenAcc: null,
+      solCerberusMetadata: null,
+      solCerberus: this.program.programId,
+    };
+    try {
+      const rule = this.findRule(roles, resource, permission, namespace);
+      if (!rule) {
+        return defaultOutput;
+      }
+      const [roleFound, resourceFound, PermissionFound, ns] = rule;
+      return await this.fetchPdaAccounts(
+        roles,
+        roleFound,
+        resourceFound,
+        PermissionFound,
+        ns,
+        this.validAssignedAddress(roles[roleFound]),
+        defaultOutput
+      );
+    } catch (e) {
+      console.error(e);
+      return defaultOutput;
+    }
+  }
+
+  async fetchPdaAccounts(
+    roles: AddressByRoleType,
+    role: string,
+    resource: string,
+    permission: string,
+    namespace: number,
+    assignedAddress: string,
+    defaultOutput: { [k: string]: PublicKey | null }
+  ) {
+    /**
+     * Fetches PDA accounts in parallel
+     */
+    let asyncFuncs = [];
+    // Rule PDA fetcher
+    asyncFuncs.push(async () =>
+      sc_rule_pda(this.appId, role, resource, permission, namespace)
+    );
+    // Role PDA fetcher
+    asyncFuncs.push(async () =>
+      sc_role_pda(this.appId, role, new PublicKey(assignedAddress))
+    );
+    // tokenAccount PDA fetcher
+    asyncFuncs.push(async () =>
+      this.getTokenAccount(roles[role][assignedAddress], assignedAddress)
+    );
+    // Metadata PDA fetcher (not required)
+    asyncFuncs.push(async () =>
+      this.getMetadataAccount(roles[role][assignedAddress])
+    );
+    const pdaNames = [
+      "solCerberusRule",
+      "solCerberusRole",
+      "solCerberusTokenAcc",
+      "solCerberusMetadata",
+    ];
+    (await Promise.allSettled(asyncFuncs.map((f) => f()))).map(
+      (pdaRequest: any, index: number) => {
+        defaultOutput[pdaNames[index]] =
+          pdaRequest.status === "fulfilled" ? pdaRequest.value : null;
+      }
+    );
+    return defaultOutput;
+  }
+
+  async getTokenAccount(
+    assignedRole: AssignedRoleObjectType,
+    assignedAddress: string
+  ) {
+    /**
+     * Adds NFT fetcher (only needed when using NFT authentication)
+     */
+    if (assignedRole.addressType === "nft") {
+      return getAssociatedTokenAddress(
+        new PublicKey(assignedAddress),
+        this.wallet
+      );
+    } else if (assignedRole.addressType === "collection") {
+      if (!assignedRole.nftMint)
+        throw new Error(
+          `Missing NFT Mint address for collection: "${assignedAddress}"`
+        );
+      return getAssociatedTokenAddress(assignedRole.nftMint, this.wallet);
+    }
+    return null;
+  }
+
+  async getMetadataAccount(assignedRole: AssignedRoleObjectType) {
+    /**
+     * Adds NFT fetcher (only needed when using NFT authentication)
+     */
+    if (assignedRole.addressType === "collection") {
+      return nft_metadata_pda(assignedRole.nftMint);
+    }
+    return null;
   }
 
   async refreshPerms() {
@@ -242,7 +457,7 @@ export class SolCerberus {
     this.#permissions = cached;
   }
 
-  parsePerms(accounts): CachedPermsType {
+  parsePerms(fetchedPerms): CachedPermsType {
     /**
      * Parse Permissions into following mapped format:
      *
@@ -267,9 +482,9 @@ export class SolCerberus {
      * }
      *
      */
-    if (!accounts) return this.defaultCachedPerms();
+    if (!fetchedPerms) return this.defaultCachedPerms();
 
-    return accounts.reduce((result: CachedPermsType, account: any) => {
+    return fetchedPerms.reduce((result: CachedPermsType, account: any) => {
       let data = account.account;
       if (!result.perms.hasOwnProperty(data.namespace)) {
         result.perms[data.namespace] = {};
@@ -316,5 +531,14 @@ export class SolCerberus {
       localStorage.getItem(this.cachePermsKey()) as string
     );
     return cached ? cached : this.defaultCachedPerms();
+  }
+
+  unauthorizedError(e) {
+    return e.hasOwnProperty("error") &&
+      e.error.hasOwnProperty("errorCode") &&
+      e.error.errorCode.hasOwnProperty("code") &&
+      e.error.errorCode.code === "Unauthorized"
+      ? true
+      : false;
   }
 }

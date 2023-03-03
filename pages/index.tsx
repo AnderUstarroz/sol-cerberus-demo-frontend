@@ -10,9 +10,10 @@ import { SolCerberusDemo } from "../sol_cerberus_demo";
 import { Metaplex, FindNftsByOwnerOutput } from "@metaplex-foundation/js";
 import { useRouter } from "next/router";
 import {
-  AddressAssignedRolesType,
+  RolesByAddressType,
   namespaces,
   SolCerberus,
+  AddressByRoleType,
 } from "../components/utils/sol-cerberus-js";
 import {
   demo_pda,
@@ -34,7 +35,8 @@ import {
   DemoType,
   PDAsType,
   NewRuleType,
-  AddresssesByRoleType,
+  ResourceDataType,
+  ResourceType,
 } from "./index-types";
 import { DEFAULT_SELECT_STYLES, flashMsg } from "../components/utils/helpers";
 import { human_number } from "../components/utils/number";
@@ -51,6 +53,7 @@ const Icon = dynamic(() => import("../components/icon"));
 const Input = dynamic(() => import("../components/input"));
 const Modal = dynamic(() => import("../components/modal"));
 const Button = dynamic(() => import("../components/button"));
+const ResourceForm = dynamic(() => import("../components/resource-form"));
 
 export default function Home() {
   const { publicKey, wallet, sendTransaction } = useWallet();
@@ -75,14 +78,23 @@ export default function Home() {
     permission: null,
     loading: false,
   });
-  const [myRoles, setMyRoles] = useState<AddresssesByRoleType>({});
+  const [myRoles, setMyRoles] = useState<AddressByRoleType>({});
+  const [resourceData, setResourceData] = useState<ResourceDataType>({
+    func: null,
+    resource: "Square",
+    action: "Add",
+    size: 0,
+    color: "",
+    loading: false,
+  });
   const [newRuleErrors, setNewRuleErrors] = useState<ErrorType>({});
   const [allAssignedRoles, setAllAssignedRoles] =
-    useState<AddressAssignedRolesType>(null);
+    useState<RolesByAddressType>(null);
   const [modals, setModals] = useState({
     main: false,
     roles: false,
     rules: false,
+    resourceForm: false,
   });
   const [pdas, setPdas] = useState<PDAsType>({
     scAppPda: null,
@@ -374,12 +386,12 @@ export default function Home() {
     setModals({ ...modals, main: false });
   };
 
-  const defaultColor = (shape: string) => {
-    if (demo[shape]) {
-      return `#${demo[shape].color}`;
-    } else if (shape === "square") {
+  const defaultColor = (resource: ResourceType) => {
+    if (demo[resource.toLowerCase()]) {
+      return `#${demo[resource.toLowerCase()].color}`;
+    } else if (resource === "Square") {
       return "#e3be59";
-    } else if (shape === "circle") {
+    } else if (resource === "Circle") {
       return "#35b7af";
     } else {
       return "#bd2742";
@@ -388,6 +400,18 @@ export default function Home() {
 
   const myAppId = (): string => {
     return `CeRb3rUs${publicKey.toBase58().slice(8)}`;
+  };
+
+  const myCurrentLogin = () => {
+    const [address, assignedData] = Object.entries(
+      Object.values(myRoles)[0]
+    )[0];
+    return (
+      <>
+        <span className="capitalize">{assignedData.addressType}</span> (
+        <strong>{short_key(address)}</strong>)
+      </>
+    );
   };
 
   const handleInitialize = async () => {
@@ -457,6 +481,10 @@ export default function Home() {
     setLoading(false);
   };
 
+  const refreshDemo = async (program, demoPda: PublicKey) => {
+    setDemo(await program.account.demo.fetch(demoPda));
+  };
+
   const initAccounts = async (appIdStr: string) => {
     setLoading(true);
     const provider: anchor.Provider = get_provider(connection, wallet);
@@ -481,10 +509,10 @@ export default function Home() {
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
     setSolCerberus(sc);
-    setAllAssignedRoles(await sc.allAssignedRoles());
+    setAllAssignedRoles(await sc.fetchAssignedRoles());
     setMetaplex(new Metaplex(connection));
     try {
-      setDemo(await demoProg.account.demo.fetch(demoPda));
+      refreshDemo(demoProg, demoPda);
     } catch (e) {
       if (appIdStr !== myAppId()) {
         console.error(`Invalid APP ID ${appIdStr}`);
@@ -514,28 +542,19 @@ export default function Home() {
   };
 
   const fetchMyRoles = async () => {
-    let allMyRoles: AddresssesByRoleType = {};
-    const rolesByAddress = Object.entries(allAssignedRoles).reduce(
-      (acc, [address, roles]) => {
-        acc[address] = Object.keys(roles);
-        return acc;
-      },
-      {}
-    );
-    // Add Wallet's roles
-    if (rolesByAddress.hasOwnProperty(publicKey.toBase58())) {
-      rolesByAddress[publicKey.toBase58()].map((role: string) => {
-        allMyRoles[role] = allMyRoles.hasOwnProperty(role)
-          ? [...allMyRoles[role], publicKey.toBase58()]
-          : [publicKey.toBase58()];
-      });
-    }
+    // No need to fetch roles for admin
+    if (isAdmin()) return;
+    let allMyRoles: AddressByRoleType = {};
     // Add NFT and Collection roles
     const allNFTs: FindNftsByOwnerOutput = await metaplex
       .nfts()
       .findAllByOwner({ owner: publicKey });
+    // A collection mint map is required when authenticating via NFT Collection
+    // otherwise we wouldn't know which NFT was authorized for having an allowed collection.
+    const collectionMintsMap = {};
     allNFTs.map((nft) => {
-      let addresses = [];
+      // Add Wallet's roles
+      let addresses = [publicKey.toBase58()];
       // Check if specific NFT has roles assigned
       if (nft.hasOwnProperty("mintAddress")) {
         // @ts-ignore
@@ -544,22 +563,74 @@ export default function Home() {
         // @ts-ignore
         addresses.push(nft.mint.address.toBase58());
       }
-      // Check if specific NFT Collection has roles assigned
+      // Check if the NFT Collection has roles assigned
       if (nft.hasOwnProperty("collection") && nft.collection) {
         // @ts-ignore
-        addresses.push(nft.collection.address.toBase58());
+        addresses.push(nft.collection.address.toBase58()); // @ts-ignore
+        collectionMintsMap[nft.collection.address.toBase58()] = nft.mintAddress;
       }
       for (const address of addresses) {
-        if (rolesByAddress.hasOwnProperty(address)) {
-          rolesByAddress[address].map((role: string) => {
-            allMyRoles[role] = allMyRoles.hasOwnProperty(role)
-              ? [...allMyRoles[role], address]
-              : [address];
+        if (allAssignedRoles.hasOwnProperty(address)) {
+          Object.entries(allAssignedRoles[address]).map(([role, values]) => {
+            if (!allMyRoles.hasOwnProperty(role)) {
+              allMyRoles[role] = {};
+            }
+            allMyRoles[role][address] = values;
+            // Add NFT mint address if authenticating via collection
+            if (values.addressType === "collection") {
+              allMyRoles[role][address].nftMint = collectionMintsMap[address];
+            }
           });
         }
       }
     });
     setMyRoles(allMyRoles);
+  };
+
+  const addResource = async (
+    resource: ResourceType,
+    color: string,
+    size: number
+  ) => {
+    setResourceData({ ...resourceData, loading: true });
+    try {
+      await demoProgram.methods[`add${resourceData.resource}`](color, size)
+        .accounts({
+          demo: pdas.demoPda,
+          ...(await solCerberus.accounts(myRoles, resource, "Add")),
+        })
+        .rpc();
+      flashMsg(`Added ${resource}`, "success");
+    } catch (e) {
+      console.log(e);
+      if (solCerberus.unauthorizedError(e)) {
+        flashMsg(`You are not authorized to add ${resource}`);
+      }
+    }
+    setModals({ ...modals, resourceForm: false });
+  };
+
+  const updateResource = async (
+    resource: ResourceType,
+    color: string,
+    size: number
+  ) => {
+    setResourceData({ ...resourceData, loading: true });
+    try {
+      await demoProgram.methods[`update${resourceData.resource}`](color, size)
+        .accounts({
+          demo: pdas.demoPda,
+          ...(await solCerberus.accounts(myRoles, resource, "Update")),
+        })
+        .rpc();
+      flashMsg(`Updated ${resource}`, "success");
+    } catch (e) {
+      console.log(e);
+      if (solCerberus.unauthorizedError(e)) {
+        flashMsg(`You are not authorized to update ${resource}`);
+      }
+    }
+    setModals({ ...modals, resourceForm: false });
   };
 
   // STEP 1 - Initialize Demo
@@ -588,6 +659,23 @@ export default function Home() {
     if (!allAssignedRoles || !metaplex || Object.keys(myRoles).length) return;
     fetchMyRoles();
   }, [allAssignedRoles, metaplex, myRoles]);
+
+  // STEP 3 - Refresh Demo on evey update
+  useEffect(() => {
+    if (!demoProgram || !pdas) return;
+    let demoWebsocket = connection.onAccountChange(
+      pdas.demoPda,
+      (_updatedAccountInfo: any, _context: any) => {
+        refreshDemo(demoProgram, pdas.demoPda);
+        // console.log("Demo updated:", updatedAccountInfo);
+        // console.log("context:", context);
+      },
+      "confirmed"
+    );
+    return () => {
+      if (demoWebsocket) connection.removeAccountChangeListener(demoWebsocket);
+    };
+  }, [demoProgram, pdas]);
 
   return (
     <>
@@ -760,31 +848,30 @@ export default function Home() {
               <div className={styles.loggedMsg}>
                 <Icon cType="info" width={30} height={30} />
                 {publicKey.toBase58() === demo.authority.toBase58() ? (
+                  <>
+                    <p>
+                      Your are currently logged in as <strong>Admin</strong> (
+                      <strong>{short_key(demo.authority)}</strong>) you are
+                      allowed to do everything!
+                    </p>
+                    <p>
+                      Try assigning some roles to other wallets or NFTs,
+                      disconnected and connect them to test access restriction.
+                    </p>
+                  </>
+                ) : Object.keys(myRoles).length ? (
                   <p>
-                    Your are currently logged in as <strong>Admin</strong> (
-                    <strong>{short_key(demo.authority)}</strong>) you are
-                    allowed to do everything!
+                    Your are currently logged in via {myCurrentLogin()} and have
+                    the following roles assigned:{" "}
+                    {Object.keys(myRoles).map((role, index: number) => (
+                      <span key={`myroles${index}`}>
+                        <span className={role}>{role}</span>
+                        {index < Object.keys(myRoles).length - 1 ? ", " : "."}
+                      </span>
+                    ))}
                   </p>
                 ) : (
-                  <p>
-                    Your are currently logged in with wallet{" "}
-                    <strong>{short_key(publicKey)}</strong> and have{" "}
-                    {Object.keys(myRoles).length ? (
-                      <>
-                        the following roles assigned:{" "}
-                        {Object.keys(myRoles).map((role, index: number) => (
-                          <span key={`myroles${index}`}>
-                            <span className={role}>{role}</span>
-                            {index < Object.keys(myRoles).length - 1
-                              ? ", "
-                              : "."}
-                          </span>
-                        ))}
-                      </>
-                    ) : (
-                      "no roles assigned."
-                    )}
-                  </p>
+                  <p>You have no roles assigned</p>
                 )}
               </div>
             </fieldset>
@@ -913,112 +1000,168 @@ export default function Home() {
               </table>
             </fieldset>
           </section>
-          <section>
-            <h2>Square</h2>
-            <div className={styles.shapeBox}>
-              <div>
-                <div className="shape">
-                  {demo.square ? <span className="square"></span> : "Empty"}
-                </div>
-                <div className={"shapeBtns"}>
-                  <div>
-                    <Button className="big button1">Add</Button>
-                    {solCerberus.hasPerm(
-                      Object.keys(myRoles),
-                      "Square",
-                      "Add"
-                    ) ? (
-                      <span>
-                        <Icon
-                          cType="valid"
-                          color="#35b7af"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Allowed
-                      </span>
+          {["Square", "Circle", "Triangle"].map((resource: ResourceType) => (
+            <section key={`${resource}-shape`}>
+              <h2>{resource}</h2>
+              <div className={styles.shapeBox}>
+                <div>
+                  <div className="shape">
+                    {demo[resource.toLowerCase()] ? (
+                      <span
+                        className={resource}
+                        style={{
+                          transform: `rotate(${
+                            [-1, 0, 1][Math.floor(Math.random() * 3)]
+                          }turn) scale(${demo[resource.toLowerCase()].size})`,
+                        }}
+                      ></span>
                     ) : (
-                      <span>
-                        <Icon
-                          cType="forbidden"
-                          color="#bd2742"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Not allowed
-                      </span>
+                      "Empty"
                     )}
                   </div>
-                  <div>
-                    <Button className="big button1">Update</Button>
-                    {solCerberus.hasPerm(
-                      Object.keys(myRoles),
-                      "Square",
-                      "Update"
-                    ) ? (
-                      <span>
-                        <Icon
-                          cType="valid"
-                          color="#35b7af"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Allowed
-                      </span>
-                    ) : (
-                      <span>
-                        <Icon
-                          cType="forbidden"
-                          color="#bd2742"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Not allowed
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <Button className="big button2">Delete</Button>
-                    {solCerberus.hasPerm(
-                      Object.keys(myRoles),
-                      "Square",
-                      "Delete"
-                    ) ? (
-                      <span>
-                        <Icon
-                          cType="valid"
-                          color="#35b7af"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Allowed
-                      </span>
-                    ) : (
-                      <span>
-                        <Icon
-                          cType="forbidden"
-                          color="#bd2742"
-                          width={10}
-                          height={10}
-                        />{" "}
-                        Not allowed
-                      </span>
-                    )}
+                  <div className={"shapeBtns"}>
+                    <div>
+                      <Button
+                        className="big button1"
+                        disabled={!!demo[resource.toLowerCase()]}
+                        title={
+                          !!demo[resource.toLowerCase()]
+                            ? `${resource} already exists, cannot be created again`
+                            : ""
+                        }
+                        onClick={() => {
+                          setResourceData({
+                            func: addResource,
+                            resource: resource,
+                            action: "Add",
+                            size: demo[resource.toLowerCase()]
+                              ? demo[resource.toLowerCase()].size
+                              : 200,
+                            color: defaultColor(resource),
+                            loading: false,
+                          });
+                          setModals({ ...modals, resourceForm: true });
+                        }}
+                      >
+                        Add
+                      </Button>
+                      {solCerberus.hasPerm(myRoles, resource, "Add") ? (
+                        <span>
+                          <Icon
+                            cType="valid"
+                            color="#35b7af"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Allowed
+                        </span>
+                      ) : (
+                        <span>
+                          <Icon
+                            cType="forbidden"
+                            color="#bd2742"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Not allowed
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <Button
+                        className="big button1"
+                        onClick={() => {
+                          setResourceData({
+                            func: updateResource,
+                            resource: resource,
+                            action: "Update",
+                            size: demo[resource.toLowerCase()]
+                              ? demo[resource.toLowerCase()].size
+                              : 200,
+                            color: defaultColor(resource),
+                            loading: false,
+                          });
+                          setModals({ ...modals, resourceForm: true });
+                        }}
+                      >
+                        Update
+                      </Button>
+                      {solCerberus.hasPerm(myRoles, resource, "Update") ? (
+                        <span>
+                          <Icon
+                            cType="valid"
+                            color="#35b7af"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Allowed
+                        </span>
+                      ) : (
+                        <span>
+                          <Icon
+                            cType="forbidden"
+                            color="#bd2742"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Not allowed
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <Button
+                        className="big button2"
+                        onClick={() => {
+                          console.log(demo.square.color);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                      {solCerberus.hasPerm(myRoles, resource, "Delete") ? (
+                        <span>
+                          <Icon
+                            cType="valid"
+                            color="#35b7af"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Allowed
+                        </span>
+                      ) : (
+                        <span>
+                          <Icon
+                            cType="forbidden"
+                            color="#bd2742"
+                            width={10}
+                            height={10}
+                          />{" "}
+                          Not allowed
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-
+            </section>
+          ))}
           <style jsx>{`
             .SquareMaster {
-              color: ${defaultColor("square")};
+              color: ${defaultColor("Square")};
+            }
+            span.Square {
+              background-color: ${defaultColor("Square")};
             }
             .CircleMaster {
-              color: ${defaultColor("circle")};
+              color: ${defaultColor("Circle")};
+            }
+            span.Circle {
+              background-color: ${defaultColor("Circle")};
             }
             .TriangleMaster {
-              color: ${defaultColor("triangle")};
+              color: ${defaultColor("Triangle")};
+            }
+            span.Triangle {
+              background-color: ${defaultColor("Triangle")};
             }
           `}</style>
         </div>
@@ -1058,17 +1201,13 @@ export default function Home() {
                       singleValue: (baseStyles: any, state: any) => {
                         return {
                           ...baseStyles,
-                          color: defaultColor(
-                            state.data.value.slice(0, -6).toLowerCase()
-                          ),
+                          color: defaultColor(state.data.value.slice(0, -6)),
                         };
                       },
                       option: (baseStyles: any, state: any) => {
                         return {
                           ...DEFAULT_SELECT_STYLES.option(baseStyles, state),
-                          color: defaultColor(
-                            state.data.value.slice(0, -6).toLowerCase()
-                          ),
+                          color: defaultColor(state.data.value.slice(0, -6)),
                         };
                       },
                       ...(assignRoleError?.role
@@ -1203,17 +1342,13 @@ export default function Home() {
                       singleValue: (baseStyles: any, state: any) => {
                         return {
                           ...baseStyles,
-                          color: defaultColor(
-                            state.data.value.slice(0, -6).toLowerCase()
-                          ),
+                          color: defaultColor(state.data.value.slice(0, -6)),
                         };
                       },
                       option: (baseStyles: any, state: any) => {
                         return {
                           ...DEFAULT_SELECT_STYLES.option(baseStyles, state),
-                          color: defaultColor(
-                            state.data.value.slice(0, -6).toLowerCase()
-                          ),
+                          color: defaultColor(state.data.value.slice(0, -6)),
                         };
                       },
                       ...(newRuleErrors?.role
@@ -1333,6 +1468,14 @@ export default function Home() {
             </>
           )}
         </div>
+      </Modal>
+      <Modal modalId={"resourceForm"} modals={modals} setIsOpen={setModals}>
+        <ResourceForm
+          data={resourceData}
+          setData={setResourceData}
+          modals={modals}
+          setModals={setModals}
+        />
       </Modal>
     </>
   );
