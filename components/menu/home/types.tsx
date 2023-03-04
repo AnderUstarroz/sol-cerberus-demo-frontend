@@ -1,3 +1,3 @@
 export interface HomeMenuType {
-  toggle: () => void | undefined
+  toggle: () => void | undefined;
 }

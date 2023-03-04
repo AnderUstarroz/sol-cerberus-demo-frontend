@@ -4,6 +4,7 @@ import type { AppProps } from "next/app";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "../styles/variables.scss";
 import "../styles/globals.scss";
+import "react-tooltip/dist/react-tooltip.css";
 
 function CubistGames({ Component, pageProps }: AppProps) {
   return (

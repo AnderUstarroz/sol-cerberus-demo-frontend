@@ -3,7 +3,7 @@ import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { sc_rule_pda } from "sol-cerberus-js";
 import DemoIDL from "../../public/idl/sol_cerberus_demo.json";
 import { SolCerberusDemo } from "../../sol_cerberus_demo";
-import { SolCerberus } from "../utils/sol-cerberus-js";
+import { SolCerberus } from "sol-cerberus-js";
 
 export function get_provider(connection: Connection, wallet): anchor.Provider {
   return new anchor.AnchorProvider(

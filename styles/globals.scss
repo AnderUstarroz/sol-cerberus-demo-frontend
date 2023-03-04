@@ -114,6 +114,7 @@ button:focus {
   outline: none;
 }
 
+.wallet-adapter-dropdown-list-item,
 button {
   font-family: "Bowlby One SC", cursive;
   text-shadow: 0px 2px 0px #000000;
@@ -153,10 +154,11 @@ button.pulsar0 {
   -webkit-animation: radial-pulse0 1.5s ease infinite;
 }
 
+.wallet-adapter-dropdown-list-item,
 .button1 {
   background-color: #7c7370;
   &:hover {
-    background-color: #5e5755;
+    background-color: #5e5755 !important;
   }
 }
 .button2 {
@@ -178,7 +180,12 @@ button.btnRadius2 {
 .txtCenter {
   text-align: center;
 }
-
+.wallet-adapter-dropdown-list-item {
+  box-shadow: 0px 4px 0px rgb(0 0 0 / 14%),
+    inset 0px 2px 0px rgb(255 255 255 / 17%),
+    inset 0px 21px 0px rgb(255 255 255 / 7%),
+    inset 0px -3px 0px rgb(0 0 0 / 17%);
+}
 .icon0,
 .icon1,
 .icon2,

@@ -12,9 +12,10 @@
   }
   button,
   a {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: "Bowlby One SC";
     font-size: var(--fontSizeSmall);
-    color: var(--colorFont3);
+    text-decoration: none;
+    color: white;
     font-weight: bold;
     > span {
       margin-right: 7px !important;

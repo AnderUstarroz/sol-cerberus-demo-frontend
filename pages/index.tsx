@@ -10,12 +10,6 @@ import { SolCerberusDemo } from "../sol_cerberus_demo";
 import { Metaplex, FindNftsByOwnerOutput } from "@metaplex-foundation/js";
 import { useRouter } from "next/router";
 import {
-  RolesByAddressType,
-  namespaces,
-  SolCerberus,
-  AddressByRoleType,
-} from "../components/utils/sol-cerberus-js";
-import {
   demo_pda,
   get_demo_program,
   get_provider,
@@ -27,6 +21,10 @@ import {
   sc_role_pda,
   sc_rule_pda,
   short_key,
+  RolesByAddressType,
+  namespaces,
+  SolCerberus,
+  AddressByRoleType,
 } from "sol-cerberus-js";
 import { LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import {
@@ -37,9 +35,10 @@ import {
   NewRuleType,
   ResourceDataType,
   ResourceType,
-} from "./index-types";
+} from "../types/index-types";
 import { DEFAULT_SELECT_STYLES, flashMsg } from "../components/utils/helpers";
 import { human_number } from "../components/utils/number";
+import { Tooltip } from "react-tooltip";
 import Select from "react-select";
 
 // https://www.shutterstock.com/video/clip-28255210-sun-surface-solar-flares
@@ -65,6 +64,7 @@ export default function Home() {
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [demo, setDemo] = useState<DemoType | null>(null);
+  const [rotateShape, setRotateShape] = useState<boolean>(false);
   const [assignRole, setAssignRole] = useState<AssignRoleType>({
     role: null,
     address: "",
@@ -78,14 +78,13 @@ export default function Home() {
     permission: null,
     loading: false,
   });
-  const [myRoles, setMyRoles] = useState<AddressByRoleType>({});
+  const [myRoles, setMyRoles] = useState<AddressByRoleType>(null);
   const [resourceData, setResourceData] = useState<ResourceDataType>({
     func: null,
     resource: "Square",
     action: "Add",
     size: 0,
     color: "",
-    loading: false,
   });
   const [newRuleErrors, setNewRuleErrors] = useState<ErrorType>({});
   const [allAssignedRoles, setAllAssignedRoles] =
@@ -512,7 +511,7 @@ export default function Home() {
     setAllAssignedRoles(await sc.fetchAssignedRoles());
     setMetaplex(new Metaplex(connection));
     try {
-      refreshDemo(demoProg, demoPda);
+      await refreshDemo(demoProg, demoPda);
     } catch (e) {
       if (appIdStr !== myAppId()) {
         console.error(`Invalid APP ID ${appIdStr}`);
@@ -530,7 +529,7 @@ export default function Home() {
     setSolCerberus(null);
     setAllAssignedRoles(null);
     setMetaplex(null);
-    setMyRoles({});
+    setMyRoles(null);
   };
 
   const isAdmin = (): boolean => {
@@ -592,9 +591,9 @@ export default function Home() {
     color: string,
     size: number
   ) => {
-    setResourceData({ ...resourceData, loading: true });
+    setModals({ ...modals, resourceForm: false });
     try {
-      await demoProgram.methods[`add${resourceData.resource}`](color, size)
+      await demoProgram.methods[`add${resource}`](color, size)
         .accounts({
           demo: pdas.demoPda,
           ...(await solCerberus.accounts(myRoles, resource, "Add")),
@@ -603,11 +602,10 @@ export default function Home() {
       flashMsg(`Added ${resource}`, "success");
     } catch (e) {
       console.log(e);
-      if (solCerberus.unauthorizedError(e)) {
-        flashMsg(`You are not authorized to add ${resource}`);
+      if (solCerberus.isAnchorError(e)) {
+        flashMsg(`${e.error.errorCode.code}: ${e.error.errorMessage}`);
       }
     }
-    setModals({ ...modals, resourceForm: false });
   };
 
   const updateResource = async (
@@ -615,9 +613,9 @@ export default function Home() {
     color: string,
     size: number
   ) => {
-    setResourceData({ ...resourceData, loading: true });
+    setModals({ ...modals, resourceForm: false });
     try {
-      await demoProgram.methods[`update${resourceData.resource}`](color, size)
+      await demoProgram.methods[`update${resource}`](color, size)
         .accounts({
           demo: pdas.demoPda,
           ...(await solCerberus.accounts(myRoles, resource, "Update")),
@@ -626,11 +624,28 @@ export default function Home() {
       flashMsg(`Updated ${resource}`, "success");
     } catch (e) {
       console.log(e);
-      if (solCerberus.unauthorizedError(e)) {
-        flashMsg(`You are not authorized to update ${resource}`);
+      if (solCerberus.isAnchorError(e)) {
+        flashMsg(`${e.error.errorCode.code}: ${e.error.errorMessage}`);
       }
     }
-    setModals({ ...modals, resourceForm: false });
+  };
+
+  const deleteResource = async (resource: ResourceType) => {
+    setModals({ ...modals, main: false });
+    try {
+      await demoProgram.methods[`delete${resource}`]()
+        .accounts({
+          demo: pdas.demoPda,
+          ...(await solCerberus.accounts(myRoles, resource, "Delete")),
+        })
+        .rpc();
+      flashMsg(`Deleted ${resource}`, "success");
+    } catch (e) {
+      console.log(e);
+      if (solCerberus.isAnchorError(e)) {
+        flashMsg(`${e.error.errorCode.code}: ${e.error.errorMessage}`);
+      }
+    }
   };
 
   // STEP 1 - Initialize Demo
@@ -656,7 +671,7 @@ export default function Home() {
 
   // STEP 2 - Obtain all roles assigned to my Wallet, NFTs or collections
   useEffect(() => {
-    if (!allAssignedRoles || !metaplex || Object.keys(myRoles).length) return;
+    if (!allAssignedRoles || !metaplex || myRoles) return;
     fetchMyRoles();
   }, [allAssignedRoles, metaplex, myRoles]);
 
@@ -677,6 +692,11 @@ export default function Home() {
     };
   }, [demoProgram, pdas]);
 
+  // Rotate Shapes whenever demo is updated
+  useEffect(() => {
+    setRotateShape(!rotateShape);
+  }, [demo]);
+
   return (
     <>
       <Head>
@@ -684,245 +704,112 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <AnimatePresence>{!publicKey && <ConnectWallet />} </AnimatePresence>
-      {loading && (
-        <div className={styles.loading}>
-          <Spinner />
-        </div>
-      )}
       <AnimatePresence>
-        {!loading && !demo && <InitializeDemo initialize={handleInitialize} />}
+        {loading && (
+          <motion.div className={styles.loading} {...DEFAULT_ANIMATION}>
+            <Spinner />
+          </motion.div>
+        )}
       </AnimatePresence>
-      {!!publicKey && demo && (
-        <div className={styles.container}>
-          <Logo />
-          <h1>
-            <span>Sol</span> Cerberus Demo
-          </h1>
-          <p>
-            Discover how easy is to enhance security in your Solana programs
-          </p>
-          <section>
-            <h2>Description</h2>
-            <fieldset className={styles.desc}>
-              <p>In this demo you will find three available roles:</p>
-              <ul className="sqList">
-                <li>
-                  <strong className="SquareMaster">SquareMaster</strong> (Can
-                  add, update or delete the resource{" "}
-                  <span className="SquareMaster">Square</span>)
-                </li>
-                <li>
-                  <strong className="CircleMaster">CircleMaster</strong> (Can
-                  add, update or delete the resource{" "}
-                  <span className="CircleMaster">Circle</span>)
-                </li>
-                <li>
-                  <strong className="TriangleMaster">TriangleMaster</strong>{" "}
-                  (Can add, update or delete the resource{" "}
-                  <span className="TriangleMaster">Triangle</span>)
-                </li>
-              </ul>
-              <p>
-                Initially each one of these roles can control just his
-                corresponding resource, but you can modify the permissions
-                anyway you like.
-              </p>
-            </fieldset>
-          </section>
-          <section>
-            <h2>
-              Assign roles{" "}
-              {isAdmin() && (
-                <span
-                  className="icon1"
-                  onClick={() => setModals({ ...modals, roles: true })}
-                >
-                  +
-                </span>
-              )}
-            </h2>
-            <fieldset>
-              <p>
-                Assign roles to wallets, NFTs or to entire NFT collections (only
-                Admin)
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Address</th>
-                    <th>Role</th>
-                    <th>Type</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <motion.tr {...DEFAULT_ANIMATION}>
-                    <td>{short_key(demo.authority)}</td>
-                    <td>Admin</td>
-                    <td>Wallet</td>
-                    <td></td>
-                  </motion.tr>
-                  <AnimatePresence>
-                    {!!allAssignedRoles &&
-                      Object.entries(allAssignedRoles).map(
-                        ([address, roles], k0: number) =>
-                          Object.entries(roles).map(
-                            ([role, data]: any, k1: number) => (
-                              <motion.tr
-                                key={`assign${k0}-${k1}`}
-                                {...DEFAULT_ANIMATION}
-                              >
-                                <td>{short_key(address)}</td>
-                                <td>
-                                  <strong className={role}>{role}</strong>
-                                </td>
-
-                                <td className="capitalize">
-                                  {data.addressType}
-                                </td>
-                                <td>
-                                  {isAdmin() && (
-                                    <Icon
-                                      cType="close"
-                                      width={10}
-                                      height={10}
-                                      className="icon2"
-                                      onClick={() =>
-                                        setMainModalContent(
-                                          <>
-                                            <h3>Delete assigned role</h3>
-                                            <p className="mb-big">
-                                              Do you really want to delete the
-                                              role{" "}
-                                              <strong className={role}>
-                                                {role}
-                                              </strong>{" "}
-                                              assigned to the{" "}
-                                              <strong className="capitalize">
-                                                {data.addressType}
-                                              </strong>
-                                              :{" "}
-                                              <strong>
-                                                {short_key(address)}
-                                              </strong>
-                                              ?
-                                            </p>
-                                            <div className="aligned centered">
-                                              <Button
-                                                className="button2"
-                                                onClick={() =>
-                                                  handleDeleteAssignedRole(
-                                                    role,
-                                                    data.addressType,
-                                                    address
-                                                  )
-                                                }
-                                              >
-                                                Delete
-                                              </Button>
-                                              <Button
-                                                className="button1"
-                                                onClick={() =>
-                                                  setModals({
-                                                    ...modals,
-                                                    main: false,
-                                                  })
-                                                }
-                                              >
-                                                Cancel
-                                              </Button>
-                                            </div>
-                                          </>
-                                        )
-                                      }
-                                    />
-                                  )}
-                                </td>
-                              </motion.tr>
-                            )
-                          )
-                      )}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-              <div className={styles.loggedMsg}>
-                <Icon cType="info" width={30} height={30} />
-                {publicKey.toBase58() === demo.authority.toBase58() ? (
-                  <>
-                    <p>
-                      Your are currently logged in as <strong>Admin</strong> (
-                      <strong>{short_key(demo.authority)}</strong>) you are
-                      allowed to do everything!
-                    </p>
-                    <p>
-                      Try assigning some roles to other wallets or NFTs,
-                      disconnected and connect them to test access restriction.
-                    </p>
-                  </>
-                ) : Object.keys(myRoles).length ? (
-                  <p>
-                    Your are currently logged in via {myCurrentLogin()} and have
-                    the following roles assigned:{" "}
-                    {Object.keys(myRoles).map((role, index: number) => (
-                      <span key={`myroles${index}`}>
-                        <span className={role}>{role}</span>
-                        {index < Object.keys(myRoles).length - 1 ? ", " : "."}
-                      </span>
-                    ))}
-                  </p>
-                ) : (
-                  <p>You have no roles assigned</p>
+      <AnimatePresence>
+        {!loading && !demo && <InitializeDemo initialize={handleInitialize} />}{" "}
+      </AnimatePresence>
+      <AnimatePresence>
+        {!!publicKey && demo && (
+          <motion.div className={styles.container} {...DEFAULT_ANIMATION}>
+            <Logo />
+            <h1>
+              <span>Sol</span> Cerberus Demo
+            </h1>
+            <p>
+              Discover how easy is to enhance security in your Solana programs
+            </p>
+            <section>
+              <h2>Description</h2>
+              <fieldset className={styles.desc}>
+                <p>In this demo you will find three available roles:</p>
+                <ul className="sqList">
+                  <li>
+                    <strong className="SquareMaster">SquareMaster</strong> (Can
+                    add, update or delete the resource{" "}
+                    <span className="SquareMaster">Square</span>)
+                  </li>
+                  <li>
+                    <strong className="CircleMaster">CircleMaster</strong> (Can
+                    add, update or delete the resource{" "}
+                    <span className="CircleMaster">Circle</span>)
+                  </li>
+                  <li>
+                    <strong className="TriangleMaster">TriangleMaster</strong>{" "}
+                    (Can add, update or delete the resource{" "}
+                    <span className="TriangleMaster">Triangle</span>)
+                  </li>
+                </ul>
+                <p>
+                  Initially each one of these roles can control just his
+                  corresponding resource, but you can modify the permissions
+                  however you like. This demo{" "}
+                  <strong>only works on Devnet</strong>, remember to choose the
+                  devnet network in your Solana wallet.
+                </p>
+                <p>
+                  Try assigning some roles to different wallets or NFTs, then
+                  disconnect and connect with them to test it out.
+                </p>
+              </fieldset>
+            </section>
+            <section>
+              <h2>
+                Assign roles{" "}
+                {isAdmin() && (
+                  <span
+                    className="icon1"
+                    onClick={() => setModals({ ...modals, roles: true })}
+                  >
+                    +
+                  </span>
                 )}
-              </div>
-            </fieldset>
-          </section>
-          <section>
-            <h2>
-              Permissions{" "}
-              {isAdmin() && (
-                <span
-                  className="icon1"
-                  onClick={() => setModals({ ...modals, rules: true })}
-                >
-                  +
-                </span>
-              )}
-            </h2>
-            <fieldset>
-              <p>
-                Manage the permissions allowed for each role on each resource
-                (only Admin)
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Role</th>
-                    <th>Resource</th>
-                    <th>Permission</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <AnimatePresence>
-                    {!!solCerberus.permissions &&
-                      Object.entries(
-                        solCerberus.permissions.perms[namespaces.Default]
-                      ).map(([role, resources], k0: number) =>
-                        Object.entries(resources).map(
-                          ([resource, permissions], k1: number) =>
-                            Object.entries(permissions).map(
-                              ([permission, data], k2: number) => (
+              </h2>
+              <fieldset>
+                <p>
+                  Assign roles to wallets, NFTs or to entire NFT collections
+                  (only Admin wallet:{" "}
+                  <strong>{short_key(demo.authority)}</strong>)
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Address</th>
+                      <th>Role</th>
+                      <th>Type</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <motion.tr {...DEFAULT_ANIMATION}>
+                      <td>{short_key(demo.authority)}</td>
+                      <td>Admin</td>
+                      <td>Wallet</td>
+                      <td></td>
+                    </motion.tr>
+                    <AnimatePresence>
+                      {!!allAssignedRoles &&
+                        Object.entries(allAssignedRoles).map(
+                          ([address, roles], k0: number) =>
+                            Object.entries(roles).map(
+                              ([role, data]: any, k1: number) => (
                                 <motion.tr
-                                  key={`perm-${k0}${k1}${k2}`}
+                                  key={`assign${k0}-${k1}`}
                                   {...DEFAULT_ANIMATION}
                                 >
+                                  <td>{short_key(address)}</td>
                                   <td>
                                     <strong className={role}>{role}</strong>
                                   </td>
-                                  <td className={`${resource}Master`}>
-                                    {resource}
+
+                                  <td className="capitalize">
+                                    {data.addressType}
                                   </td>
-                                  <td>{permission}</td>
                                   <td>
                                     {isAdmin() && (
                                       <Icon
@@ -933,40 +820,31 @@ export default function Home() {
                                         onClick={() =>
                                           setMainModalContent(
                                             <>
-                                              <h3>Delete permission</h3>
-                                              <p className="mb-med">
-                                                Do you really want to delete the
-                                                permission:{" "}
-                                              </p>
+                                              <h3>Delete assigned role</h3>
                                               <p className="mb-big">
-                                                <span className="aligned gap5">
-                                                  <strong className={role}>
-                                                    {role}
-                                                  </strong>
-                                                  <Icon
-                                                    cType="chevron"
-                                                    direction="right"
-                                                  />
-                                                  <strong
-                                                    className={`${resource}Master`}
-                                                  >
-                                                    {resource}
-                                                  </strong>
-                                                  <Icon
-                                                    cType="chevron"
-                                                    direction="right"
-                                                  />
-                                                  <strong>{permission}</strong>
-                                                </span>
+                                                Do you really want to delete the
+                                                role{" "}
+                                                <strong className={role}>
+                                                  {role}
+                                                </strong>{" "}
+                                                assigned to the{" "}
+                                                <strong className="capitalize">
+                                                  {data.addressType}
+                                                </strong>
+                                                :{" "}
+                                                <strong>
+                                                  {short_key(address)}
+                                                </strong>
+                                                ?
                                               </p>
                                               <div className="aligned centered">
                                                 <Button
                                                   className="button2"
                                                   onClick={() =>
-                                                    handleDeleteRule(
+                                                    handleDeleteAssignedRole(
                                                       role,
-                                                      resource,
-                                                      permission
+                                                      data.addressType,
+                                                      address
                                                     )
                                                   }
                                                 >
@@ -993,179 +871,394 @@ export default function Home() {
                                 </motion.tr>
                               )
                             )
-                        )
-                      )}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </fieldset>
-          </section>
-          {["Square", "Circle", "Triangle"].map((resource: ResourceType) => (
-            <section key={`${resource}-shape`}>
-              <h2>{resource}</h2>
-              <div className={styles.shapeBox}>
-                <div>
-                  <div className="shape">
-                    {demo[resource.toLowerCase()] ? (
+                        )}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+                <div className={styles.loggedMsg}>
+                  <Icon cType="info" width={30} height={30} />
+                  {publicKey.toBase58() === demo.authority.toBase58() ? (
+                    <div>
+                      <p>
+                        Your are currently logged in as <strong>Admin</strong> (
+                        <strong>{short_key(demo.authority)}</strong>) you are
+                        allowed to do everything!
+                      </p>
+                      <p>
+                        Try assigning some roles to other wallets or NFTs, then
+                        disconnect and connect them to test access.
+                      </p>
+                    </div>
+                  ) : myRoles && Object.keys(myRoles).length ? (
+                    <p>
+                      Your are currently logged in via {myCurrentLogin()} and
+                      have the following roles assigned:{" "}
+                      {Object.keys(myRoles).map((role, index: number) => (
+                        <span key={`myroles${index}`}>
+                          <span className={role}>{role}</span>
+                          {index < Object.keys(myRoles).length - 1 ? ", " : "."}
+                        </span>
+                      ))}
+                    </p>
+                  ) : (
+                    <p>
+                      You are connected via wallet{" "}
+                      <strong>{short_key(publicKey)}</strong>, but have no roles
+                      assigned.
+                    </p>
+                  )}
+                </div>
+              </fieldset>
+            </section>
+            <section>
+              <h2>
+                Permissions{" "}
+                {isAdmin() && (
+                  <span
+                    className="icon1"
+                    onClick={() => setModals({ ...modals, rules: true })}
+                  >
+                    +
+                  </span>
+                )}
+              </h2>
+              <fieldset>
+                <p>
+                  Manage the permissions allowed for each role on each resource
+                  (only Admin wallet:{" "}
+                  <strong>{short_key(demo.authority)}</strong>)
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Role</th>
+                      <th>Resource</th>
+                      <th>Permission</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <AnimatePresence>
+                      {!!solCerberus.permissions &&
+                        Object.entries(
+                          solCerberus.permissions.perms[namespaces.Default]
+                        ).map(([role, resources], k0: number) =>
+                          Object.entries(resources).map(
+                            ([resource, permissions], k1: number) =>
+                              Object.entries(permissions).map(
+                                ([permission, data], k2: number) => (
+                                  <motion.tr
+                                    key={`perm-${k0}${k1}${k2}`}
+                                    {...DEFAULT_ANIMATION}
+                                  >
+                                    <td>
+                                      <strong className={role}>{role}</strong>
+                                    </td>
+                                    <td className={`${resource}Master`}>
+                                      {resource}
+                                    </td>
+                                    <td>{permission}</td>
+                                    <td>
+                                      {isAdmin() && (
+                                        <Icon
+                                          cType="close"
+                                          width={10}
+                                          height={10}
+                                          className="icon2"
+                                          onClick={() =>
+                                            setMainModalContent(
+                                              <>
+                                                <h3>Delete permission</h3>
+                                                <p className="mb-med">
+                                                  Do you really want to delete
+                                                  the permission:{" "}
+                                                </p>
+                                                <p className="mb-big">
+                                                  <span className="aligned gap5">
+                                                    <strong className={role}>
+                                                      {role}
+                                                    </strong>
+                                                    <Icon
+                                                      cType="chevron"
+                                                      direction="right"
+                                                    />
+                                                    <strong
+                                                      className={`${resource}Master`}
+                                                    >
+                                                      {resource}
+                                                    </strong>
+                                                    <Icon
+                                                      cType="chevron"
+                                                      direction="right"
+                                                    />
+                                                    <strong>
+                                                      {permission}
+                                                    </strong>
+                                                  </span>
+                                                </p>
+                                                <div className="aligned centered">
+                                                  <Button
+                                                    className="button2"
+                                                    onClick={() =>
+                                                      handleDeleteRule(
+                                                        role,
+                                                        resource,
+                                                        permission
+                                                      )
+                                                    }
+                                                  >
+                                                    Delete
+                                                  </Button>
+                                                  <Button
+                                                    className="button1"
+                                                    onClick={() =>
+                                                      setModals({
+                                                        ...modals,
+                                                        main: false,
+                                                      })
+                                                    }
+                                                  >
+                                                    Cancel
+                                                  </Button>
+                                                </div>
+                                              </>
+                                            )
+                                          }
+                                        />
+                                      )}
+                                    </td>
+                                  </motion.tr>
+                                )
+                              )
+                          )
+                        )}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </fieldset>
+            </section>
+            {["Square", "Circle", "Triangle"].map((resource: ResourceType) => (
+              <section key={`${resource}-shape`}>
+                <h2>{resource}</h2>
+                <div className={styles.shapeBox}>
+                  <div>
+                    <div className="shape">
                       <span
                         className={resource}
                         style={{
-                          transform: `rotate(${
-                            [-1, 0, 1][Math.floor(Math.random() * 3)]
-                          }turn) scale(${demo[resource.toLowerCase()].size})`,
+                          transform: `${
+                            rotateShape ? "rotate(2turn)" : "rotate(0turn)"
+                          } scale(${
+                            demo[resource.toLowerCase()]
+                              ? demo[resource.toLowerCase()].size
+                              : 0
+                          })`,
                         }}
                       ></span>
-                    ) : (
-                      "Empty"
-                    )}
-                  </div>
-                  <div className={"shapeBtns"}>
-                    <div>
-                      <Button
-                        className="big button1"
-                        disabled={!!demo[resource.toLowerCase()]}
-                        title={
-                          !!demo[resource.toLowerCase()]
-                            ? `${resource} already exists, cannot be created again`
-                            : ""
-                        }
-                        onClick={() => {
-                          setResourceData({
-                            func: addResource,
-                            resource: resource,
-                            action: "Add",
-                            size: demo[resource.toLowerCase()]
-                              ? demo[resource.toLowerCase()].size
-                              : 200,
-                            color: defaultColor(resource),
-                            loading: false,
-                          });
-                          setModals({ ...modals, resourceForm: true });
-                        }}
-                      >
-                        Add
-                      </Button>
-                      {solCerberus.hasPerm(myRoles, resource, "Add") ? (
-                        <span>
-                          <Icon
-                            cType="valid"
-                            color="#35b7af"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Allowed
-                        </span>
-                      ) : (
-                        <span>
-                          <Icon
-                            cType="forbidden"
-                            color="#bd2742"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Not allowed
-                        </span>
-                      )}
                     </div>
-                    <div>
-                      <Button
-                        className="big button1"
-                        onClick={() => {
-                          setResourceData({
-                            func: updateResource,
-                            resource: resource,
-                            action: "Update",
-                            size: demo[resource.toLowerCase()]
-                              ? demo[resource.toLowerCase()].size
-                              : 200,
-                            color: defaultColor(resource),
-                            loading: false,
-                          });
-                          setModals({ ...modals, resourceForm: true });
-                        }}
-                      >
-                        Update
-                      </Button>
-                      {solCerberus.hasPerm(myRoles, resource, "Update") ? (
-                        <span>
-                          <Icon
-                            cType="valid"
-                            color="#35b7af"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Allowed
-                        </span>
-                      ) : (
-                        <span>
-                          <Icon
-                            cType="forbidden"
-                            color="#bd2742"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Not allowed
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <Button
-                        className="big button2"
-                        onClick={() => {
-                          console.log(demo.square.color);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                      {solCerberus.hasPerm(myRoles, resource, "Delete") ? (
-                        <span>
-                          <Icon
-                            cType="valid"
-                            color="#35b7af"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Allowed
-                        </span>
-                      ) : (
-                        <span>
-                          <Icon
-                            cType="forbidden"
-                            color="#bd2742"
-                            width={10}
-                            height={10}
-                          />{" "}
-                          Not allowed
-                        </span>
-                      )}
+                    <div className={"shapeBtns"}>
+                      <div>
+                        <div
+                          data-tooltip-id={`addBtn-${resource}`}
+                          data-tooltip-content={
+                            demo[resource.toLowerCase()]
+                              ? `${resource} already exists`
+                              : null
+                          }
+                        >
+                          <Button
+                            className="big button1"
+                            disabled={!!demo[resource.toLowerCase()]}
+                            onClick={() => {
+                              setResourceData({
+                                func: addResource,
+                                resource: resource,
+                                action: "Add",
+                                size: demo[resource.toLowerCase()]
+                                  ? demo[resource.toLowerCase()].size
+                                  : 200,
+                                color: defaultColor(resource),
+                              });
+                              setModals({ ...modals, resourceForm: true });
+                            }}
+                          >
+                            Add
+                          </Button>
+                          <Tooltip id={`addBtn-${resource}`} />
+                        </div>
+                        {solCerberus.hasPerm(myRoles, resource, "Add") ? (
+                          <span>
+                            <Icon
+                              cType="valid"
+                              color="#35b7af"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Allowed
+                          </span>
+                        ) : (
+                          <span>
+                            <Icon
+                              cType="forbidden"
+                              color="#bd2742"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Not allowed
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div
+                          data-tooltip-id={`updateBtn-${resource}`}
+                          data-tooltip-content={
+                            demo[resource.toLowerCase()]
+                              ? null
+                              : `Need to add ${resource} first`
+                          }
+                        >
+                          <Button
+                            className="big button1"
+                            disabled={!demo[resource.toLowerCase()]}
+                            onClick={() => {
+                              setResourceData({
+                                func: updateResource,
+                                resource: resource,
+                                action: "Update",
+                                size: demo[resource.toLowerCase()]
+                                  ? demo[resource.toLowerCase()].size
+                                  : 200,
+                                color: defaultColor(resource),
+                              });
+                              setModals({ ...modals, resourceForm: true });
+                            }}
+                          >
+                            Update
+                          </Button>
+                          <Tooltip id={`updateBtn-${resource}`} />
+                        </div>
+                        {solCerberus.hasPerm(myRoles, resource, "Update") ? (
+                          <span>
+                            <Icon
+                              cType="valid"
+                              color="#35b7af"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Allowed
+                          </span>
+                        ) : (
+                          <span>
+                            <Icon
+                              cType="forbidden"
+                              color="#bd2742"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Not allowed
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div
+                          data-tooltip-id={`deleteBtn-${resource}`}
+                          data-tooltip-content={
+                            demo[resource.toLowerCase()]
+                              ? null
+                              : `Need to add ${resource} first`
+                          }
+                        >
+                          <Button
+                            className="big button2"
+                            disabled={!demo[resource.toLowerCase()]}
+                            onClick={() =>
+                              setMainModalContent(
+                                <>
+                                  <h3>Delete {resource}</h3>
+                                  <p className="mb-big">
+                                    Do you really want to delete the{" "}
+                                    <strong className={`${resource}Master`}>
+                                      {resource}
+                                    </strong>
+                                    ?
+                                  </p>
+                                  <div className="aligned centered">
+                                    <Button
+                                      className="button2"
+                                      onClick={() => deleteResource(resource)}
+                                    >
+                                      Delete
+                                    </Button>
+                                    <Button
+                                      className="button1"
+                                      onClick={() =>
+                                        setModals({
+                                          ...modals,
+                                          main: false,
+                                        })
+                                      }
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </>
+                              )
+                            }
+                          >
+                            Delete
+                          </Button>
+                          <Tooltip id={`deleteBtn-${resource}`} />
+                        </div>
+                        {solCerberus.hasPerm(myRoles, resource, "Delete") ? (
+                          <span>
+                            <Icon
+                              cType="valid"
+                              color="#35b7af"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Allowed
+                          </span>
+                        ) : (
+                          <span>
+                            <Icon
+                              cType="forbidden"
+                              color="#bd2742"
+                              width={10}
+                              height={10}
+                            />{" "}
+                            Not allowed
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </section>
-          ))}
-          <style jsx>{`
-            .SquareMaster {
-              color: ${defaultColor("Square")};
-            }
-            span.Square {
-              background-color: ${defaultColor("Square")};
-            }
-            .CircleMaster {
-              color: ${defaultColor("Circle")};
-            }
-            span.Circle {
-              background-color: ${defaultColor("Circle")};
-            }
-            .TriangleMaster {
-              color: ${defaultColor("Triangle")};
-            }
-            span.Triangle {
-              background-color: ${defaultColor("Triangle")};
-            }
-          `}</style>
-        </div>
-      )}
+              </section>
+            ))}
+            <style jsx>{`
+              .SquareMaster {
+                color: ${defaultColor("Square")};
+              }
+              span.Square {
+                background-color: ${defaultColor("Square")};
+              }
+              .CircleMaster {
+                color: ${defaultColor("Circle")};
+              }
+              span.Circle {
+                background-color: ${defaultColor("Circle")};
+              }
+              .TriangleMaster {
+                color: ${defaultColor("Triangle")};
+              }
+              span.Triangle {
+                border-bottom-color: ${defaultColor("Triangle")};
+              }
+            `}</style>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Modal modalId={"main"} modals={modals} setIsOpen={setModals}>
         {mainModal}
       </Modal>

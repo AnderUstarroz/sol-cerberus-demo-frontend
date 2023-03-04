@@ -1,4 +1,4 @@
-import { ResourceDataType } from "../../pages/index-types";
+import { ResourceDataType } from "../../types/index-types";
 
 export interface ResourceFormType {
   data: ResourceDataType;

@@ -6,7 +6,7 @@
     font-size: 60px;
     text-align: center;
     color: #e9d8c1;
-    margin: 0 25px 0 0;
+    margin: 0 0 10px 0;
   }
   h2 {
     display: flex;
@@ -86,7 +86,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 30px;
   }
   & :global {
     .shape {
@@ -100,7 +100,15 @@
         width: 1px;
         height: 1px;
         transition: all 1s ease-in;
-        transform: scale(0) rotate(0turn);
+        &.Circle {
+          border-radius: 50%;
+        }
+        &.Triangle {
+          border-left: 1px solid transparent;
+          border-right: 1px solid transparent;
+          border-bottom-width: 1px;
+          border-bottom-style: solid;
+        }
       }
     }
     .shapeBtns {
@@ -125,8 +133,6 @@
     }
   }
 }
-.shapeBtns {
-}
 .loading {
   height: 100%;
   display: flex;
@@ -150,10 +156,21 @@
 }
 @media (max-width: 768px) {
   .container {
+    h1 {
+      font-size: 32px;
+      margin: 0 10px 10px 10px;
+    }
     section {
       h2 {
         margin-left: 48px;
       }
+      fieldset {
+        padding: 32px;
+      }
     }
+  }
+
+  .loggedMsg {
+    flex-direction: column;
   }
 }

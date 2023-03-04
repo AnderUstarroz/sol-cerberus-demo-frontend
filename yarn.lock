@@ -551,10 +551,22 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@floating-ui/core@^1.1.0":
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/@floating-ui/core/-/core-1.2.2.tgz#66f62cf1b7de2ed23a09c101808536e68caffaec"
+  integrity sha512-FaO9KVLFnxknZaGWGmNtjD2CVFuc0u4yeGEofoyXO2wgRA7fLtkngT6UB0vtWQWuhH3iMTZZ/Y89CMeyGfn8pA==
+
 "@floating-ui/core@^1.2.1":
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/@floating-ui/core/-/core-1.2.1.tgz#074182a1d277f94569c50a6b456e62585d463c8e"
   integrity sha512-LSqwPZkK3rYfD7GKoIeExXOyYx6Q1O4iqZWwIehDNuv3Dv425FIAE8PRwtAx1imEolFTHgBEcoFHm9MDnYgPCg==
+
+"@floating-ui/dom@1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@floating-ui/dom/-/dom-1.1.1.tgz#66aa747e15894910869bf9144fc54fc7d6e9f975"
+  integrity sha512-TpIO93+DIujg3g7SykEAGZMDtbJRrmnYRCNYSjJlvIbGhBjRSNTLVbNeDQBrzy9qDgUbiWdc7KA0uZHZ2tJmiw==
+  dependencies:
+    "@floating-ui/core" "^1.1.0"
 
 "@floating-ui/dom@^1.0.1":
   version "1.2.1"
@@ -1154,7 +1166,7 @@
   dependencies:
     buffer "~6.0.3"
 
-"@solana/spl-token@^0.3.5", "@solana/spl-token@^0.3.6":
+"@solana/spl-token@^0.3.5", "@solana/spl-token@^0.3.6", "@solana/spl-token@^0.3.7":
   version "0.3.7"
   resolved "https://registry.yarnpkg.com/@solana/spl-token/-/spl-token-0.3.7.tgz#6f027f9ad8e841f792c32e50920d9d2e714fc8da"
   integrity sha512-bKGxWTtIw6VDdCBngjtsGlKGLSmiu/8ghSt/IOYJV24BsymRbgq7r12GToeetpxmPaZYLddKwAz7+EwprLfkfg==
@@ -2972,6 +2984,11 @@ cipher-base@^1.0.0, cipher-base@^1.0.1, cipher-base@^1.0.3:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
+classnames@^2.3.2:
+  version "2.3.2"
+  resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.3.2.tgz#351d813bf0137fcc6a76a16b88208d2560a0d924"
+  integrity sha512-CSbhY4cFEJRe6/GQzIk5qXZ4Jeg5pcsP7b5peFSDpffpe1cqjASH/n9UTjBwOp6XpMSTwQ8Za2K5V02ueA7Tmw==
+
 cli-cursor@^3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/cli-cursor/-/cli-cursor-3.1.0.tgz#264305a7ae490d1d03bf0c9ba7c925d1753af307"
@@ -4780,6 +4797,14 @@ react-select@^5.7.0:
     react-transition-group "^4.3.0"
     use-isomorphic-layout-effect "^1.1.2"
 
+react-tooltip@^5.8.3:
+  version "5.8.3"
+  resolved "https://registry.yarnpkg.com/react-tooltip/-/react-tooltip-5.8.3.tgz#d9c94eafb6c3d4d7be43b4acfe6f3cbde82df9ab"
+  integrity sha512-h7maAlm2Xeymc14gWKhhrzsENeB83N65EzZ+AcQIGrOpNE0yefVRJIHhNcWHEJ0FEtf7VZXxtsj5glVXKxEtvA==
+  dependencies:
+    "@floating-ui/dom" "1.1.1"
+    classnames "^2.3.2"
+
 react-transition-group@^4.3.0:
   version "4.4.5"
   resolved "https://registry.yarnpkg.com/react-transition-group/-/react-transition-group-4.4.5.tgz#e53d4e3f3344da8521489fbef8f2581d42becdd1"
@@ -5093,10 +5118,13 @@ socket.io-parser@~4.2.1:
     "@socket.io/component-emitter" "~3.1.0"
     debug "~4.3.1"
 
-"sol-cerberus-js@file:../sol-cerberus-js":
-  version "0.0.5"
+sol-cerberus-js@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/sol-cerberus-js/-/sol-cerberus-js-0.0.2.tgz#863384f9ea6a819f634c60ef4645a7cc3c2b85e7"
+  integrity sha512-gqJA21/6OfIr4OQZjsSfRUgQmyLUJcH1+uTThJN3XTwObqbcWJEjFSlyY4BCF0TH7kMB+G08dvTHjsCJix7RZg==
   dependencies:
     "@project-serum/anchor" "^0.26.0"
+    "@solana/spl-token" "^0.3.7"
     big-number "^2.0.0"
 
 sonic-boom@^1.0.2:

@@ -47,5 +47,4 @@ export interface ResourceDataType {
   action: ActionType;
   size: number;
   color: string;
-  loading: boolean;
 }
