@@ -5,7 +5,7 @@ import styles from "../styles/Home.module.scss";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { DEFAULT_ANIMATION } from "../components/utils/animation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { SolCerberusDemo } from "../sol_cerberus_demo";
 import { Metaplex, FindNftsByOwnerOutput } from "@metaplex-foundation/js";
 import { useRouter } from "next/router";
@@ -25,6 +25,8 @@ import {
   namespaces,
   SolCerberus,
   AddressByRoleType,
+  CachedPermsType,
+  default_cached_perms,
 } from "sol-cerberus-js";
 import { LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import {
@@ -61,6 +63,11 @@ export default function Home() {
   const [demoProgram, setDemoProgram] =
     useState<anchor.Program<SolCerberusDemo> | null>(null);
   const [solCerberus, setSolCerberus] = useState<SolCerberus | null>(null);
+  const solCerberusRef = useRef(solCerberus);
+  solCerberusRef.current = solCerberus;
+  const [permissions, setPermissions] = useState<CachedPermsType>(
+    default_cached_perms()
+  );
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [demo, setDemo] = useState<DemoType | null>(null);
@@ -484,6 +491,16 @@ export default function Home() {
     setDemo(await program.account.demo.fetch(demoPda));
   };
 
+  const handleUpdatedRules = async () => {
+    if (!solCerberusRef.current) return;
+    setPermissions(await solCerberusRef.current.fetchPerms());
+  };
+
+  const handleUpdatedRoles = async () => {
+    if (!solCerberusRef.current) return;
+    setAllAssignedRoles(await solCerberusRef.current.fetchAssignedRoles());
+  };
+
   const initAccounts = async (appIdStr: string) => {
     setLoading(true);
     const provider: anchor.Provider = get_provider(connection, wallet);
@@ -493,7 +510,10 @@ export default function Home() {
     let demoPda: PublicKey;
     try {
       scAppId = new PublicKey(appIdStr);
-      sc = new SolCerberus(scAppId, provider);
+      sc = new SolCerberus(scAppId, provider, {
+        rulesChangedCallback: handleUpdatedRules,
+        rolesChangedCallback: handleUpdatedRoles,
+      });
       [scAppPda, demoPda] = (
         await Promise.allSettled([sc_app_pda(scAppId), demo_pda(scAppId)])
       )
@@ -508,6 +528,7 @@ export default function Home() {
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
     setSolCerberus(sc);
+    setPermissions(await sc.fetchPerms());
     setAllAssignedRoles(await sc.fetchAssignedRoles());
     setMetaplex(new Metaplex(connection));
     try {
@@ -523,6 +544,7 @@ export default function Home() {
   };
 
   const clearAccounts = () => {
+    solCerberus.destroy();
     setPdas({ scAppPda: null, demoPda: null });
     setDemoProgram(null);
     setDemo(null);
@@ -667,6 +689,11 @@ export default function Home() {
     (async () => {
       await initAccounts(appId);
     })();
+    return () => {
+      if (solCerberus) {
+        solCerberus.destroy();
+      }
+    };
   }, [publicKey, solCerberus]);
 
   // STEP 2 - Obtain all roles assigned to my Wallet, NFTs or collections
@@ -939,9 +966,9 @@ export default function Home() {
                   </thead>
                   <tbody>
                     <AnimatePresence>
-                      {!!solCerberus.permissions &&
+                      {!!Object.keys(permissions.perms) &&
                         Object.entries(
-                          solCerberus.permissions.perms[namespaces.Default]
+                          permissions.perms[namespaces.Default]
                         ).map(([role, resources], k0: number) =>
                           Object.entries(resources).map(
                             ([resource, permissions], k1: number) =>

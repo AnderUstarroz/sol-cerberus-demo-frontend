@@ -35,7 +35,7 @@ export default function HomeMenu({ toggle }: HomeMenuType) {
           <SiteLinks toggle={toggle} />
           <Button cType="transparent">
             <Link
-              href="https://solcerberus.com/docs"
+              href="https://docs.solcerberus.com"
               title="Documentation"
               onClick={toggle}
             >
