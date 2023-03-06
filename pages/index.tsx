@@ -739,7 +739,9 @@ export default function Home() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {!loading && !demo && <InitializeDemo initialize={handleInitialize} />}{" "}
+        {!!publicKey && !loading && !demo && (
+          <InitializeDemo initialize={handleInitialize} />
+        )}{" "}
       </AnimatePresence>
       <AnimatePresence>
         {!!publicKey && demo && (
