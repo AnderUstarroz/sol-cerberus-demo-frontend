@@ -566,6 +566,8 @@ export default function Home() {
     // No need to fetch roles for admin
     if (isAdmin()) return;
     let allMyRoles: AddressByRoleType = {};
+    // Add Wallet's roles
+    let addresses = [publicKey.toBase58()];
     // Add NFT and Collection roles
     const allNFTs: FindNftsByOwnerOutput = await metaplex
       .nfts()
@@ -574,8 +576,6 @@ export default function Home() {
     // otherwise we wouldn't know which NFT was authorized for having an allowed collection.
     const collectionMintsMap = {};
     allNFTs.map((nft) => {
-      // Add Wallet's roles
-      let addresses = [publicKey.toBase58()];
       // Check if specific NFT has roles assigned
       if (nft.hasOwnProperty("mintAddress")) {
         // @ts-ignore
@@ -590,21 +590,21 @@ export default function Home() {
         addresses.push(nft.collection.address.toBase58()); // @ts-ignore
         collectionMintsMap[nft.collection.address.toBase58()] = nft.mintAddress;
       }
-      for (const address of addresses) {
-        if (allAssignedRoles.hasOwnProperty(address)) {
-          Object.entries(allAssignedRoles[address]).map(([role, values]) => {
-            if (!allMyRoles.hasOwnProperty(role)) {
-              allMyRoles[role] = {};
-            }
-            allMyRoles[role][address] = values;
-            // Add NFT mint address if authenticating via collection
-            if (values.addressType === "collection") {
-              allMyRoles[role][address].nftMint = collectionMintsMap[address];
-            }
-          });
-        }
-      }
     });
+    for (const address of addresses) {
+      if (allAssignedRoles.hasOwnProperty(address)) {
+        Object.entries(allAssignedRoles[address]).map(([role, values]) => {
+          if (!allMyRoles.hasOwnProperty(role)) {
+            allMyRoles[role] = {};
+          }
+          allMyRoles[role][address] = values;
+          // Add NFT mint address if authenticating via collection
+          if (values.addressType === "collection") {
+            allMyRoles[role][address].nftMint = collectionMintsMap[address];
+          }
+        });
+      }
+    }
     setMyRoles(allMyRoles);
   };
 
