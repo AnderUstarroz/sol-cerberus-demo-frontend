@@ -13,12 +13,16 @@
   button,
   a {
     font-family: "Bowlby One SC";
-    font-size: var(--fontSizeSmall);
+    text-transform: uppercase;
+    font-size: var(--fontSizeBig);
     text-decoration: none;
     color: white;
     font-weight: bold;
     > span {
       margin-right: 7px !important;
+    }
+    &:hover {
+      filter: brightness(0.85);
     }
   }
 }

@@ -3,15 +3,12 @@ import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { HomeMenuType } from "./types";
 import Link from "next/link";
-import { useRouter } from "next/router";
 
 const SiteLinks = dynamic(() => import("../menu_item/site_links"));
 const Button = dynamic(() => import("../../button"));
 const MenuItem = dynamic(() => import("../menu_item"));
 
 export default function HomeMenu({ toggle }: HomeMenuType) {
-  const router = useRouter();
-
   // const ScrollSection = (section: string) => {
   //   if (toggle) {
   //     toggle();
@@ -33,24 +30,6 @@ export default function HomeMenu({ toggle }: HomeMenuType) {
       <MenuItem className="leftItems" whileHover={{}} whileTap={{}}>
         <div>
           <SiteLinks toggle={toggle} />
-          <Button cType="transparent">
-            <Link
-              href="https://docs.solcerberus.com"
-              title="Documentation"
-              onClick={toggle}
-            >
-              Docs
-            </Link>
-          </Button>
-          <Button cType="transparent">
-            <Link
-              href={`/${router.query.id ? `?id=${router.query.id}` : ""}`}
-              title="Sol Cerberus demo"
-              onClick={toggle}
-            >
-              Demo
-            </Link>
-          </Button>
         </div>
       </MenuItem>
 
@@ -68,6 +47,28 @@ export default function HomeMenu({ toggle }: HomeMenuType) {
           </Button>
         </div>
       </MenuItem> */}
+      <MenuItem whileTap={{}} whileHover={{}}>
+        <Button cType="transparent">
+          <Link
+            href="https://docs.solcerberus.com/"
+            title="Documentation"
+            onClick={toggle}
+          >
+            Docs
+          </Link>
+        </Button>
+      </MenuItem>
+      <MenuItem whileTap={{}} whileHover={{}}>
+        <Button cType="transparent">
+          <Link
+            href="https://demo.solcerberus.com/"
+            title="Sol Cerberus demo"
+            onClick={toggle}
+          >
+            Demo
+          </Link>
+        </Button>
+      </MenuItem>
       <MenuItem whileTap={{}} whileHover={{}}>
         <Button cType="wallet" className="btnRadius2" />
       </MenuItem>
