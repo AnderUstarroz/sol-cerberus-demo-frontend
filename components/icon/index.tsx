@@ -28,6 +28,7 @@ const Icons: IconTypes = {
   time: dynamic(() => import("./time")),
   notification: dynamic(() => import("./notification")),
   forbidden: dynamic(() => import("./forbidden")),
+  github: dynamic(() => import("./github")),
 };
 
 function Icon({ cType, ...props }: IconType) {

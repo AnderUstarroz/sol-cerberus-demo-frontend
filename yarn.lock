@@ -5118,10 +5118,10 @@ socket.io-parser@~4.2.1:
     "@socket.io/component-emitter" "~3.1.0"
     debug "~4.3.1"
 
-sol-cerberus-js@^0.0.2:
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/sol-cerberus-js/-/sol-cerberus-js-0.0.2.tgz#863384f9ea6a819f634c60ef4645a7cc3c2b85e7"
-  integrity sha512-gqJA21/6OfIr4OQZjsSfRUgQmyLUJcH1+uTThJN3XTwObqbcWJEjFSlyY4BCF0TH7kMB+G08dvTHjsCJix7RZg==
+sol-cerberus-js@^0.0.5:
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/sol-cerberus-js/-/sol-cerberus-js-0.0.5.tgz#2e013a2f4702ad7014b2d6f855567cdbd600a0c0"
+  integrity sha512-1psBjpA6mjBLF7UDWVrkj8HHK40NKoKGJuJbTeGwhBZCBLeLWPrNHbvYsqifOrbh85lL82NmUpnnRwMuVKB4Mw==
   dependencies:
     "@project-serum/anchor" "^0.26.0"
     "@solana/spl-token" "^0.3.7"

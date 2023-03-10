@@ -47,6 +47,7 @@
 }
 
 .desc {
+  position: relative;
   > p {
     margin-bottom: 15px !important;
   }
@@ -54,7 +55,19 @@
     color: #8c8494;
   }
 }
-
+.github {
+  display: flex;
+  gap: 5px;
+  font-size: var(--fontSizeXS);
+  position: absolute;
+  top: -15px;
+  right: 20px;
+  margin: 30px 0 0 0;
+  text-align: center;
+  a {
+    color: #8c8494;
+  }
+}
 .shapeBox {
   color: #282524;
   background-color: unset;

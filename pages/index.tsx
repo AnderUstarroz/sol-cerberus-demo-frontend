@@ -751,13 +751,15 @@ export default function Home() {
             <h1>
               <span>Sol</span> Cerberus Demo
             </h1>
-            <p>
-              Discover how easy is to enhance security in your Solana programs
-            </p>
+            <p>Solana's watch dog</p>
             <section>
               <h2>Description</h2>
               <fieldset className={styles.desc}>
-                <p>In this demo you will find three available roles:</p>
+                <p>
+                  Discover how easy is to enhance security in your Solana
+                  programs. In this demo you can play with three available
+                  roles:
+                </p>
                 <ul className="sqList">
                   <li>
                     <strong className="SquareMaster">SquareMaster</strong> (Can
@@ -784,7 +786,18 @@ export default function Home() {
                 </p>
                 <p>
                   Try assigning some roles to different wallets or NFTs, then
-                  disconnect and connect with them to test it out.
+                  disconnect and connect with them to test them out.
+                </p>
+                <p className={styles.github}>
+                  Source code{" "}
+                  <a
+                    className="link aligned gap5"
+                    href="https://github.com/AnderUstarroz/sol-cerberus-demo"
+                    target="_blank"
+                  >
+                    available on Github
+                    <Icon cType="github" />
+                  </a>
                 </p>
               </fieldset>
             </section>
