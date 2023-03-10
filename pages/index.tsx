@@ -27,6 +27,7 @@ import {
   AddressByRoleType,
   CachedPermsType,
   default_cached_perms,
+  addressType,
 } from "sol-cerberus-js";
 import { LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import {
@@ -142,7 +143,7 @@ export default function Home() {
           .assignRole({
             address: address,
             role: assignRole.role,
-            addressType: { [assignRole.type.toLowerCase()]: {} },
+            addressType: addressType[assignRole.type],
             expiresAt: null,
           })
           .accounts({
