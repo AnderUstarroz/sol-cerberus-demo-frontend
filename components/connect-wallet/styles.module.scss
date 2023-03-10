@@ -1,14 +1,18 @@
 .connectWallet {
-    > div {
-      margin: auto;
-      width: fit-content;
-      text-align: center;
-      > button {
-        margin: 40px auto 0 auto;
+  > div {
+    margin: auto;
+    width: fit-content;
+    text-align: center;
+    > button {
+      margin: 30px auto 0 auto;
+    }
+    > p {
+      > span {
+        display: inline-block;
       }
     }
-    h1 {
-      margin: 0 0 15px 0;
-    }
   }
-  
+  h1 {
+    margin: 0 0 15px 0;
+  }
+}

@@ -731,7 +731,11 @@ export default function Home() {
         <title>Sol Cerberus Demo</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <AnimatePresence>{!publicKey && <ConnectWallet />} </AnimatePresence>
+      <AnimatePresence>
+        {!publicKey && (
+          <ConnectWallet setMainModalContent={setMainModalContent} />
+        )}{" "}
+      </AnimatePresence>
       <AnimatePresence>
         {loading && (
           <motion.div className={styles.loading} {...DEFAULT_ANIMATION}>
@@ -751,7 +755,7 @@ export default function Home() {
             <h1>
               <span>Sol</span> Cerberus Demo
             </h1>
-            <p>Solana's watch dog</p>
+            <p>Solana's on-chain watch dog</p>
             <section>
               <h2>Description</h2>
               <fieldset className={styles.desc}>

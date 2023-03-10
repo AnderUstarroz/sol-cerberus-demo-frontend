@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { InitializeDemoPropsType } from "./types";
 
 const Button = dynamic(() => import("../button"));
+const Logo = dynamic(() => import("../../components/logo"));
 
 export default function InitializeDemo({
   initialize,
@@ -15,11 +16,9 @@ export default function InitializeDemo({
       {...DEFAULT_ANIMATION}
     >
       <div>
+        <Logo />
         <h1>Sol Cerberus Demo</h1>
-        <p>
-          Learn how easily Sol Cerberus can enhance security in your Solana
-          programs
-        </p>
+        <p>Learn how easy is to enhance security in your Solana programs</p>
         <Button className="button1" onClick={() => initialize()}>
           Initialize Demo
         </Button>
