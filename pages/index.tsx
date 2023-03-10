@@ -15,6 +15,7 @@ import {
   get_provider,
   add_rules_instructions,
   get_balances,
+  myAppId,
 } from "../components/utils/sol-cerberus-demo";
 import {
   sc_app_pda,
@@ -405,10 +406,6 @@ export default function Home() {
     }
   };
 
-  const myAppId = (): string => {
-    return `CeRb3rUs${publicKey.toBase58().slice(8)}`;
-  };
-
   const myCurrentLogin = () => {
     const [address, assignedData] = Object.entries(
       Object.values(myRoles)[0]
@@ -418,6 +415,17 @@ export default function Home() {
         <span className="capitalize">{assignedData.addressType}</span> (
         <strong>{short_key(address)}</strong>)
       </>
+    );
+  };
+
+  /**
+   * Defines the default APP so users can find it when they close the browser
+   *  and come back connecting with a diferent wallet.
+   */
+  const setDefaultApp = async (defaultDemo: DemoType) => {
+    localStorage.setItem(
+      "DefaultSolCerberusAPP",
+      defaultDemo.authority.toBase58()
     );
   };
 
@@ -489,7 +497,9 @@ export default function Home() {
   };
 
   const refreshDemo = async (program, demoPda: PublicKey) => {
-    setDemo(await program.account.demo.fetch(demoPda));
+    const defaultApp = await program.account.demo.fetch(demoPda);
+    setDefaultApp(defaultApp);
+    setDemo(defaultApp);
   };
 
   const handleUpdatedRules = async () => {
@@ -535,7 +545,7 @@ export default function Home() {
     try {
       await refreshDemo(demoProg, demoPda);
     } catch (e) {
-      if (appIdStr !== myAppId()) {
+      if (appIdStr !== myAppId(publicKey)) {
         console.error(`Invalid APP ID ${appIdStr}`);
         return (window.location.href = "/");
       }
@@ -682,10 +692,14 @@ export default function Home() {
     }
     if (solCerberus) return;
     // Get APP ID from query param or generate one from our wallet
-    let appId = router.query.id ? (router.query.id as string) : myAppId();
+    let appId = router.query.id
+      ? (router.query.id as string)
+      : myAppId(publicKey);
     // The APP ID must be defined as query param to facilitate other wallets accessing the APP.
     if (!router.query.id) {
-      router.push(`/?id=${appId}`, undefined, { shallow: true });
+      router.push(`/?id=${appId}`, undefined, {
+        shallow: true,
+      });
     }
     (async () => {
       await initAccounts(appId);
@@ -793,13 +807,12 @@ export default function Home() {
                   disconnect and connect with them to test them out.
                 </p>
                 <p className={styles.github}>
-                  Source code{" "}
                   <a
                     className="link aligned gap5"
                     href="https://github.com/AnderUstarroz/sol-cerberus-demo"
                     target="_blank"
                   >
-                    available on Github
+                    Source code available on Github
                     <Icon cType="github" />
                   </a>
                 </p>

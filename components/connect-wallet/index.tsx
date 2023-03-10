@@ -12,7 +12,6 @@ const Logo = dynamic(() => import("../../components/logo"));
 const Icon = dynamic(() => import("../../components/icon"));
 
 export default function ConnectWallet({ setMainModalContent }) {
-  console.log(setMainModalContent);
   return (
     <AnimatePresence>
       <motion.div

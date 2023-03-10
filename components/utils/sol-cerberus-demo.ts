@@ -13,6 +13,10 @@ export function get_provider(connection: Connection, wallet): anchor.Provider {
   );
 }
 
+export const myAppId = (publicKey: PublicKey): string => {
+  return `CeRb3rUs${publicKey.toBase58().slice(8)}`;
+};
+
 export const get_demo_program = (
   provider: any
 ): anchor.Program<SolCerberusDemo> => {

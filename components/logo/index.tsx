@@ -3,21 +3,25 @@ import styles from "./styles.module.scss";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { motion, useAnimationControls } from "framer-motion";
+import { useEffect, useState } from "react";
 
 const Flame = dynamic(() => import("../flame"));
 const Flame2 = dynamic(() => import("../flame2"));
 
 export default function Logo() {
+  const [loaded, setLoaded] = useState<boolean>(false);
   const controls = useAnimationControls();
 
-  const handleImageLoad = () => {
-    controls.start({
-      opacity: 1,
-      scale: 1,
-      rotate: 720,
-      transition: { duration: 0.6 },
-    });
-  };
+  useEffect(() => {
+    if (loaded) {
+      controls.start({
+        opacity: 1,
+        scale: 1,
+        rotate: 720,
+        transition: { duration: 0.6 },
+      });
+    }
+  }, [loaded]);
 
   return (
     <div className={styles.container}>
@@ -28,7 +32,7 @@ export default function Logo() {
               <Image
                 src={SolCerberusImg}
                 width={200}
-                onLoadingComplete={() => handleImageLoad()}
+                onLoadingComplete={() => setLoaded(true)}
                 alt="Sol Cerberus"
               />
             </div>

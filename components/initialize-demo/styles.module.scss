@@ -1,6 +1,6 @@
 .initialize {
   > div {
-    margin: auto;
+    margin: 185px auto 0 auto;
     width: fit-content;
     text-align: center;
     > button {
@@ -9,5 +9,13 @@
   }
   h1 {
     margin: 0 0 15px 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .initialize {
+    > div {
+      margin: auto;
+    }
   }
 }
