@@ -9,6 +9,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { SolCerberusDemo } from "../sol_cerberus_demo";
 import { Metaplex, FindNftsByOwnerOutput } from "@metaplex-foundation/js";
 import { useRouter } from "next/router";
+import { format, addMinutes } from "date-fns";
 import {
   demo_pda,
   get_demo_program,
@@ -44,6 +45,7 @@ import { DEFAULT_SELECT_STYLES, flashMsg } from "../components/utils/helpers";
 import { human_number } from "../components/utils/number";
 import { Tooltip } from "react-tooltip";
 import Select from "react-select";
+import { format_time } from "../components/utils/date";
 
 // https://www.shutterstock.com/video/clip-28255210-sun-surface-solar-flares
 // https://www.google.com/search?q=sun+burning+video&rlz=1C5CHFA_enES984ES984&oq=sun+burning+video&aqs=chrome..69i57j0i19i512l9.2381j0j7&sourceid=chrome&ie=UTF-8#fpstate=ive&vld=cid:e9eb4c89,vid:WBMl-JV0DoE
@@ -57,6 +59,7 @@ const Input = dynamic(() => import("../components/input"));
 const Modal = dynamic(() => import("../components/modal"));
 const Button = dynamic(() => import("../components/button"));
 const ResourceForm = dynamic(() => import("../components/resource-form"));
+const Checkbox = dynamic(() => import("../components/checkbox"));
 
 export default function Home() {
   const { publicKey, wallet, sendTransaction } = useWallet();
@@ -78,7 +81,9 @@ export default function Home() {
     role: null,
     address: "",
     type: null,
+    expiresAt: null,
     loading: false,
+    useCustomRole: false,
   });
   const [assignRoleError, setAssignRoleError] = useState<ErrorType>({});
   const [newRule, setNewRule] = useState<NewRuleType>({
@@ -96,6 +101,7 @@ export default function Home() {
     color: "",
   });
   const [newRuleErrors, setNewRuleErrors] = useState<ErrorType>({});
+  const [roles, setRoles] = useState<string[]>([]);
   const [allAssignedRoles, setAllAssignedRoles] =
     useState<RolesByAddressType>(null);
   const [modals, setModals] = useState({
@@ -145,7 +151,9 @@ export default function Home() {
             address: address,
             role: assignRole.role,
             addressType: addressType[assignRole.type],
-            expiresAt: null,
+            expiresAt: assignRole.expiresAt
+              ? new anchor.BN(assignRole.expiresAt.getTime() / 1000)
+              : null,
           })
           .accounts({
             app: pdas.scAppPda,
@@ -173,7 +181,9 @@ export default function Home() {
       role: null,
       address: "",
       type: null,
+      expiresAt: null,
       loading: false,
+      useCustomRole: false,
     });
   };
 
@@ -182,6 +192,7 @@ export default function Home() {
     type: string,
     address: string
   ) => {
+    setModals({ ...modals, main: false });
     try {
       await solCerberus.program.methods
         .deleteAssignedRole()
@@ -227,6 +238,14 @@ export default function Home() {
       new PublicKey(assignRole.address);
     } catch (e) {
       errors.address = "Invalid address";
+    }
+    if (!errors.role && !/^[a-zA-Z0-9]+$/.test(assignRole.role)) {
+      errors.role =
+        "Invalid Role, must contain only numbers and letters: a-z, A-Z, 0-9";
+    }
+    if (assignRole.expiresAt && assignRole.expiresAt < new Date()) {
+      errors.expiresAt =
+        "The role is already expired! Please select a future date";
     }
     if (Object.keys(errors).length) {
       setAssignRoleError(
@@ -353,6 +372,7 @@ export default function Home() {
     resource: string,
     permission: string
   ) => {
+    setModals({ ...modals, main: false });
     try {
       await solCerberus.program.methods
         .deleteRule()
@@ -401,8 +421,10 @@ export default function Home() {
       return "#e3be59";
     } else if (resource === "Circle") {
       return "#35b7af";
-    } else {
+    } else if (resource === "Triangle") {
       return "#bd2742";
+    } else {
+      return "#ffffff";
     }
   };
 
@@ -711,13 +733,27 @@ export default function Home() {
     };
   }, [publicKey, solCerberus]);
 
-  // STEP 2 - Obtain all roles assigned to my Wallet, NFTs or collections
+  // STEP 2 - Obtain all roles assigned to my Wallet, NFTs or collections whenever roles change
   useEffect(() => {
-    if (!allAssignedRoles || !metaplex || myRoles) return;
-    fetchMyRoles();
-  }, [allAssignedRoles, metaplex, myRoles]);
+    if (!allAssignedRoles || !metaplex) return;
+    // Define available roles
+    setRoles([
+      ...new Set(
+        Object.values(allAssignedRoles).reduce(
+          (result, roles) => {
+            Object.keys(roles).map((role) => result.push(role));
+            return result;
+          },
+          ["SquareMaster", "CircleMaster", "TriangleMaster"]
+        )
+      ),
+    ]);
+    if (!myRoles) {
+      fetchMyRoles();
+    }
+  }, [allAssignedRoles, metaplex]);
 
-  // STEP 3 - Refresh Demo on evey update
+  // STEP 3 - Refresh Demo on every update
   useEffect(() => {
     if (!demoProgram || !pdas) return;
     let demoWebsocket = connection.onAccountChange(
@@ -769,7 +805,7 @@ export default function Home() {
             <h1>
               <span>Sol</span> Cerberus Demo
             </h1>
-            <p>Solana's on-chain watch dog</p>
+            <p>The new authority</p>
             <section>
               <h2>Description</h2>
               <fieldset className={styles.desc}>
@@ -842,6 +878,7 @@ export default function Home() {
                       <th>Address</th>
                       <th>Role</th>
                       <th>Type</th>
+                      <th>Expires</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -850,6 +887,7 @@ export default function Home() {
                       <td>{short_key(demo.authority)}</td>
                       <td>Admin</td>
                       <td>Wallet</td>
+                      <td>Never</td>
                       <td></td>
                     </motion.tr>
                     <AnimatePresence>
@@ -866,9 +904,29 @@ export default function Home() {
                                   <td>
                                     <strong className={role}>{role}</strong>
                                   </td>
-
                                   <td className="capitalize">
                                     {data.addressType}
+                                  </td>
+                                  <td>
+                                    {data.expiresAt ? (
+                                      data.expiresAt < new Date().getTime() ? (
+                                        <span
+                                          className="aligned"
+                                          style={{ gap: 3, color: "#bd2742" }}
+                                        >
+                                          <Icon
+                                            cType="exclamation"
+                                            width={17}
+                                            height={17}
+                                          />{" "}
+                                          Expired
+                                        </span>
+                                      ) : (
+                                        format_time(new Date(data.expiresAt))
+                                      )
+                                    ) : (
+                                      "Never"
+                                    )}
                                   </td>
                                   <td>
                                     {isAdmin() && (
@@ -1324,65 +1382,124 @@ export default function Home() {
       </Modal>
       <Modal modalId={"roles"} modals={modals} setIsOpen={setModals}>
         <h3>Assign role</h3>
-        <p className="mb-big">Assign role to: Wallet, NFT, Collection</p>
-        <div>
-          {assignRole.loading ? (
-            <Spinner />
-          ) : (
-            <>
+        <p className="mb-big">Assign role to a Wallet, NFT or Collection.</p>
+        {assignRole.loading ? (
+          <Spinner />
+        ) : (
+          <>
+            <div className="aligned mb-med">
+              <label
+                className={styles.checkbox}
+                onClick={(e) =>
+                  setAssignRole({
+                    ...assignRole,
+                    useCustomRole: !assignRole.useCustomRole,
+                    role: "",
+                  })
+                }
+              >
+                <Checkbox
+                  id="useCustomRole"
+                  name="useCustomRole"
+                  value={assignRole.useCustomRole}
+                />
+                Custom role
+              </label>
+              <AnimatePresence>
+                {assignRole.useCustomRole ? (
+                  <motion.label
+                    className="overlap fullCol"
+                    {...DEFAULT_ANIMATION}
+                  >
+                    <Input
+                      className="fullWidth"
+                      autoComplete="off"
+                      value={assignRole.role}
+                      style={
+                        assignRoleError.role
+                          ? {
+                              borderColor: "#BD2742",
+                            }
+                          : undefined
+                      }
+                      maxLength="16"
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setAssignRole({
+                          ...assignRole,
+                          role: e.target.value,
+                        })
+                      }
+                      onBlur={(e: React.FocusEvent<HTMLInputElement>) =>
+                        handleValidateAssignRole("role")
+                      }
+                    />
+                    <span>Role</span>
+                  </motion.label>
+                ) : (
+                  <motion.label
+                    className="overlap fullCol"
+                    {...DEFAULT_ANIMATION}
+                  >
+                    <Select
+                      className="fullWidth"
+                      placeholder="Select role.."
+                      name="role"
+                      options={roles.map((role) => {
+                        return {
+                          value: role,
+                          label: role,
+                        };
+                      })}
+                      value={
+                        assignRole.role
+                          ? {
+                              value: assignRole.role,
+                              label: assignRole.role,
+                            }
+                          : null
+                      }
+                      styles={{
+                        ...DEFAULT_SELECT_STYLES,
+                        singleValue: (baseStyles: any, state: any) => {
+                          return {
+                            ...baseStyles,
+                            color: defaultColor(state.data.value.slice(0, -6)),
+                          };
+                        },
+                        option: (baseStyles: any, state: any) => {
+                          return {
+                            ...DEFAULT_SELECT_STYLES.option(baseStyles, state),
+                            color: defaultColor(state.data.value.slice(0, -6)),
+                          };
+                        },
+                        ...(assignRoleError?.role
+                          ? {
+                              container: (styles) => ({
+                                ...styles,
+                                border: "1px solid #BD2742",
+                              }),
+                            }
+                          : {}),
+                      }}
+                      onChange={(option, _actionMeta) => {
+                        const { role, ...otherErrors } = assignRoleError;
+                        setAssignRoleError(otherErrors);
+                        setAssignRole({
+                          ...assignRole,
+                          role: option?.value,
+                        });
+                      }}
+                      onBlur={(e: React.FocusEvent<HTMLInputElement>) =>
+                        handleValidateAssignRole("role")
+                      }
+                    />{" "}
+                    <span>Role</span>
+                  </motion.label>
+                )}
+              </AnimatePresence>
+            </div>
+            <div>
               <div className="aligned mobileCols mb-med">
-                <label className="overlap fullCol">
-                  <Select
-                    className="fullWidth"
-                    placeholder="Select role.."
-                    name="role"
-                    options={[
-                      { value: "SquareMaster", label: "SquareMaster" },
-                      { value: "CircleMaster", label: "CircleMaster" },
-                      { value: "TriangleMaster", label: "TriangleMaster" },
-                    ]}
-                    value={
-                      assignRole.role
-                        ? {
-                            value: assignRole.role,
-                            label: assignRole.role,
-                          }
-                        : null
-                    }
-                    styles={{
-                      ...DEFAULT_SELECT_STYLES,
-                      singleValue: (baseStyles: any, state: any) => {
-                        return {
-                          ...baseStyles,
-                          color: defaultColor(state.data.value.slice(0, -6)),
-                        };
-                      },
-                      option: (baseStyles: any, state: any) => {
-                        return {
-                          ...DEFAULT_SELECT_STYLES.option(baseStyles, state),
-                          color: defaultColor(state.data.value.slice(0, -6)),
-                        };
-                      },
-                      ...(assignRoleError?.role
-                        ? {
-                            container: (styles) => ({
-                              ...styles,
-                              border: "1px solid #BD2742",
-                            }),
-                          }
-                        : {}),
-                    }}
-                    onChange={(option, _actionMeta) => {
-                      const { role, ...otherErrors } = assignRoleError;
-                      setAssignRoleError(otherErrors);
-                      setAssignRole({ ...assignRole, role: option?.value });
-                    }}
-                    onBlur={(e: React.FocusEvent<HTMLInputElement>) =>
-                      handleValidateAssignRole("role")
-                    }
-                  />
-                  <span>Role</span>
-                </label>
                 <label className="overlap fullCol">
                   <Select
                     className="fullWidth"
@@ -1424,7 +1541,7 @@ export default function Home() {
                   <span>Type</span>
                 </label>
               </div>
-              <div className="flex mb-big">
+              <div className="flex mb-med">
                 <label className="overlap fullCol">
                   <Input
                     className="fullWidth"
@@ -1446,7 +1563,84 @@ export default function Home() {
                     }
                   />
                   <span>Address</span>
+                  <Button
+                    cType="transparent"
+                    data-tooltip-id="assign-address-input"
+                    data-tooltip-content={
+                      "The public key of a Wallet, NFT or Collection"
+                    }
+                  >
+                    <Icon cType="info" className="icon3" />
+                  </Button>
                 </label>
+              </div>
+              <div className="aligned mb-big">
+                <label
+                  className={styles.checkbox}
+                  onClick={(e) =>
+                    setAssignRole({
+                      ...assignRole,
+                      expiresAt: assignRole.expiresAt
+                        ? null
+                        : new Date(
+                            addMinutes(new Date(), 5).setSeconds(0) // Remove seconds
+                          ),
+                    })
+                  }
+                >
+                  <Checkbox
+                    id="useExpiration"
+                    name="useExpiration"
+                    value={!!assignRole.expiresAt}
+                  />
+                  Temporary role
+                </label>
+                <AnimatePresence>
+                  {!!assignRole.expiresAt && (
+                    <motion.label
+                      className="overlap fullCol"
+                      {...DEFAULT_ANIMATION}
+                    >
+                      <Input
+                        type="datetime-local"
+                        name="openTime"
+                        className="fullWidth"
+                        style={
+                          assignRoleError.expiresAt
+                            ? {
+                                borderColor: "#BD2742",
+                              }
+                            : undefined
+                        }
+                        value={format(
+                          assignRole.expiresAt,
+                          "yyyy-MM-dd'T'HH:mm"
+                        )}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setAssignRole({
+                            ...assignRole,
+                            expiresAt: new Date(
+                              new Date(e.target.value).setSeconds(0) // Remove seconds
+                            ),
+                          })
+                        }
+                        onBlur={(e: React.FocusEvent<HTMLInputElement>) =>
+                          handleValidateAssignRole("expiresAt")
+                        }
+                      />
+                      <span>Expires</span>
+                      <Button
+                        cType="transparent"
+                        data-tooltip-id="assign-expiresAt-input"
+                        data-tooltip-content={
+                          "The role will be effective until the provided date"
+                        }
+                      >
+                        <Icon cType="info" className="icon3" />
+                      </Button>
+                    </motion.label>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="aligned centered">
                 <Button onClick={() => handleAddAssignRole()}>Add</Button>
@@ -1457,9 +1651,11 @@ export default function Home() {
                   Cancel
                 </Button>
               </div>
-            </>
-          )}
-        </div>
+              <Tooltip id="assign-expiresAt-input" />
+              <Tooltip id="assign-address-input" />
+            </div>
+          </>
+        )}
       </Modal>
       <Modal modalId={"rules"} modals={modals} setIsOpen={setModals}>
         <h3>Add permission</h3>
@@ -1477,11 +1673,12 @@ export default function Home() {
                     className="fullWidth"
                     placeholder="Select role.."
                     name="new-role"
-                    options={[
-                      { value: "SquareMaster", label: "SquareMaster" },
-                      { value: "CircleMaster", label: "CircleMaster" },
-                      { value: "TriangleMaster", label: "TriangleMaster" },
-                    ]}
+                    options={roles.map((role) => {
+                      return {
+                        value: role,
+                        label: role,
+                      };
+                    })}
                     value={
                       newRule.role
                         ? {

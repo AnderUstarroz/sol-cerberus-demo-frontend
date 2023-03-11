@@ -27,7 +27,9 @@ export interface AssignRoleType {
   role: string;
   address: string;
   type: "NFT" | "Wallet" | "Collection";
+  expiresAt: Date;
   loading: boolean;
+  useCustomRole: boolean;
 }
 export interface NewRuleType {
   role: string;

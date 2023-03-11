@@ -35,8 +35,8 @@ export default function ConnectWallet({ setMainModalContent }) {
                       </span>
                       <h3>Connect to Devnet network</h3>
                       <p className="mb-big">
-                        If you are using Phantom wallet, you can use the
-                        following steps to connect to Devnet network.
+                        If you use a Phantom wallet, please follow these steps
+                        to connect to Devnet network.
                       </p>
                       <ul className="sqList">
                         <li>
