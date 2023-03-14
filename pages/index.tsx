@@ -525,12 +525,12 @@ export default function Home() {
   };
 
   const handleUpdatedRules = async () => {
-    if (!solCerberusRef.current) return;
+    if (!solCerberusRef.current || !demo) return;
     setPermissions(await solCerberusRef.current.fetchPerms());
   };
 
   const handleUpdatedRoles = async () => {
-    if (!solCerberusRef.current) return;
+    if (!solCerberusRef.current || !demo) return;
     setAllAssignedRoles(await solCerberusRef.current.fetchAssignedRoles());
   };
 
@@ -547,6 +547,7 @@ export default function Home() {
         rulesChangedCallback: handleUpdatedRules,
         rolesChangedCallback: handleUpdatedRoles,
       });
+      setSolCerberus(sc);
       [scAppPda, demoPda] = (
         await Promise.allSettled([sc_app_pda(scAppId), demo_pda(scAppId)])
       )
@@ -560,7 +561,6 @@ export default function Home() {
     const demoProg = get_demo_program(provider);
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
-    setSolCerberus(sc);
     setPermissions(await sc.fetchPerms());
     setAllAssignedRoles(await sc.fetchAssignedRoles());
     setMetaplex(new Metaplex(connection));
@@ -1057,7 +1057,7 @@ export default function Home() {
                   </thead>
                   <tbody>
                     <AnimatePresence>
-                      {!!Object.keys(permissions.perms) &&
+                      {!!Object.keys(permissions.perms).length &&
                         Object.entries(
                           permissions.perms[namespaces.Default]
                         ).map(([role, resources], k0: number) =>
