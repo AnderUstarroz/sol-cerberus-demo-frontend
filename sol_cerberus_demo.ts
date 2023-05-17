@@ -29,6 +29,27 @@ export type SolCerberusDemo = {
       ]
     },
     {
+      "name": "deleteDemo",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "demo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "collector",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addSquare",
       "accounts": [
         {
@@ -632,11 +653,16 @@ export type SolCerberusDemo = {
   "errors": [
     {
       "code": 6000,
+      "name": "Unauthorized",
+      "msg": "The user does not have enough privileges to perform this action"
+    },
+    {
+      "code": 6001,
       "name": "InvalidColor",
       "msg": "Invalid color! The color must have 6 ASCII alphanumeric characters"
     },
     {
-      "code": 6001,
+      "code": 6002,
       "name": "ShapeAlreadyExists",
       "msg": "Shape already exists!"
     }
@@ -674,6 +700,27 @@ export const IDL: SolCerberusDemo = {
       ]
     },
     {
+      "name": "deleteDemo",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "demo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "collector",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addSquare",
       "accounts": [
         {
@@ -1277,11 +1324,16 @@ export const IDL: SolCerberusDemo = {
   "errors": [
     {
       "code": 6000,
+      "name": "Unauthorized",
+      "msg": "The user does not have enough privileges to perform this action"
+    },
+    {
+      "code": 6001,
       "name": "InvalidColor",
       "msg": "Invalid color! The color must have 6 ASCII alphanumeric characters"
     },
     {
-      "code": 6001,
+      "code": 6002,
       "name": "ShapeAlreadyExists",
       "msg": "Shape already exists!"
     }

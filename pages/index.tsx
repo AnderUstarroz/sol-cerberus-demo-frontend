@@ -76,6 +76,8 @@ export default function Home() {
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [demo, setDemo] = useState<DemoType | null>(null);
+  const demoRef = useRef(demo);
+  demoRef.current = demo;
   const [rotateShape, setRotateShape] = useState<boolean>(false);
   const [assignRole, setAssignRole] = useState<AssignRoleType>({
     role: null,
@@ -525,12 +527,12 @@ export default function Home() {
   };
 
   const handleUpdatedRules = async () => {
-    if (!solCerberusRef.current || !demo) return;
+    if (!solCerberusRef.current || !demoRef.current) return;
     setPermissions(await solCerberusRef.current.fetchPerms());
   };
 
   const handleUpdatedRoles = async () => {
-    if (!solCerberusRef.current || !demo) return;
+    if (!solCerberusRef.current || !demoRef.current) return;
     setAllAssignedRoles(await solCerberusRef.current.fetchAssignedRoles());
   };
 
@@ -868,9 +870,10 @@ export default function Home() {
               </h2>
               <fieldset>
                 <p>
-                  Assign roles to wallets, NFTs or to entire NFT collections
-                  (only Admin wallet:{" "}
-                  <strong>{short_key(demo.authority)}</strong>)
+                  Assign roles to wallets, NFTs or to entire NFT collections.
+                  Only Admin wallet (
+                  <strong>{short_key(demo.authority)}</strong>) can modify
+                  roles.
                 </p>
                 <table>
                   <thead>
@@ -1042,9 +1045,10 @@ export default function Home() {
               </h2>
               <fieldset>
                 <p>
-                  Manage the permissions allowed for each role on each resource
-                  (only Admin wallet:{" "}
-                  <strong>{short_key(demo.authority)}</strong>)
+                  Manage the permissions allowed for each role on each resource.
+                  Only Admin wallet (
+                  <strong>{short_key(demo.authority)}</strong>) can modify
+                  permissions.
                 </p>
                 <table>
                   <thead>
