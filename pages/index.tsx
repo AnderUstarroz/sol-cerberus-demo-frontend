@@ -463,6 +463,7 @@ export default function Home() {
           id: solCerberus.appId,
           recovery: null,
           name: "SolCerberusDemo",
+          cached: false,
         })
         .accounts({
           app: pdas.scAppPda,

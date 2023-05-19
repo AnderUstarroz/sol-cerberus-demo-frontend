@@ -1,7 +1,7 @@
 .default {
   &:global {
     &.error {
-      border: 1px solid var(--errorBg);
+      border: 1px solid #bd2742;
     }
   }
 }
