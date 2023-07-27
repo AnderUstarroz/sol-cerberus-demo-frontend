@@ -86,9 +86,15 @@ export async function add_rules_instructions(
                 expiresAt: null,
               })
               .accounts({
-                app: scAppPda,
                 rule: rulesPdas[`${role}${perm}`],
-                authority: publicKey,
+                solCerberusApp: scAppPda,
+                solCerberusRole: null,
+                solCerberusRule: null,
+                solCerberusRule2: null,
+                solCerberusToken: null,
+                solCerberusMetadata: null,
+                solCerberusSeed: null,
+                signer: publicKey,
               })
               .instruction()
           ),

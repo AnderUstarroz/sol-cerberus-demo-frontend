@@ -26,7 +26,7 @@ export interface PDAsType {
 export interface AssignRoleType {
   role: string;
   address: string;
-  type: "NFT" | "Wallet" | "Collection";
+  type: "nft" | "wallet" | "collection";
   expiresAt: Date;
   loading: boolean;
   useCustomRole: boolean;

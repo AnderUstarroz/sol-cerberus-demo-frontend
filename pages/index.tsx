@@ -19,17 +19,17 @@ import {
   myAppId,
 } from "../components/utils/sol-cerberus-demo";
 import {
-  sc_app_pda,
-  sc_role_pda,
-  sc_rule_pda,
+  appPda,
+  rolePda,
+  rulePda,
   short_key,
   RolesByAddressType,
   namespaces,
   SolCerberus,
   AddressByRoleType,
   CachedPermsType,
-  default_cached_perms,
-  addressType,
+  rolesGroupedBy,
+  addressTypes,
 } from "sol-cerberus-js";
 import { LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import {
@@ -70,9 +70,7 @@ export default function Home() {
   const [solCerberus, setSolCerberus] = useState<SolCerberus | null>(null);
   const solCerberusRef = useRef(solCerberus);
   solCerberusRef.current = solCerberus;
-  const [permissions, setPermissions] = useState<CachedPermsType>(
-    default_cached_perms()
-  );
+  const [permissions, setPermissions] = useState<CachedPermsType>({});
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [demo, setDemo] = useState<DemoType | null>(null);
@@ -128,15 +126,11 @@ export default function Home() {
   const handleAddAssignRole = async () => {
     if (!handleValidateAssignRole(null)) return;
     let address = new PublicKey(assignRole.address);
-    let rolePda = await sc_role_pda(
-      solCerberus.appId,
-      assignRole.role,
-      address
-    );
+    let rolePDA = await rolePda(solCerberus.appId, assignRole.role, address);
     setAssignRole({ ...assignRole, loading: true });
     try {
       // Try to fetch the Role PDA, it should fail, otherwise it means that this assignation already exists!
-      await solCerberus.program.account.role.fetch(rolePda);
+      await solCerberus.program.account.role.fetch(rolePDA);
       // Only executed when Role is already assigned:
       flashMsg(
         <div>
@@ -148,20 +142,15 @@ export default function Home() {
     } catch (e) {
       try {
         // Assign Role to address:
-        await solCerberus.program.methods
-          .assignRole({
-            address: address,
-            role: assignRole.role,
-            addressType: addressType[assignRole.type],
-            expiresAt: assignRole.expiresAt
-              ? new anchor.BN(assignRole.expiresAt.getTime() / 1000)
-              : null,
-          })
-          .accounts({
-            app: pdas.scAppPda,
-            role: rolePda,
-          })
-          .rpc();
+        await solCerberus.assignRole(
+          assignRole.role,
+          assignRole.type as addressTypes,
+          address,
+          {
+            expiresAt: assignRole.expiresAt ?? null,
+          }
+        );
+
         flashMsg(
           <div>
             Assigned role <strong>{assignRole.role}</strong> to{" "}
@@ -196,18 +185,8 @@ export default function Home() {
   ) => {
     setModals({ ...modals, main: false });
     try {
-      await solCerberus.program.methods
-        .deleteAssignedRole()
-        .accounts({
-          app: pdas.scAppPda,
-          role: await sc_role_pda(
-            solCerberus.appId,
-            role,
-            new PublicKey(address)
-          ),
-          collector: publicKey,
-        })
-        .rpc();
+      await solCerberus.deleteAssignedRole(role, type as addressTypes, address);
+
       flashMsg(
         <div>
           Deleted role <strong>{role}</strong> from {type} {short_key(address)}
@@ -291,7 +270,7 @@ export default function Home() {
 
   const handleNewRule = async () => {
     if (!handleValidateNewRule(null)) return;
-    let rulePda = await sc_rule_pda(
+    let rulePDA = await rulePda(
       solCerberus.appId,
       newRule.role,
       newRule.resource,
@@ -300,7 +279,7 @@ export default function Home() {
     setNewRule({ ...newRule, loading: true });
     try {
       // Try to fetch the Rule PDA, it should fail, otherwise it means that this assignation already exists!
-      await solCerberus.program.account.rule.fetch(rulePda);
+      await solCerberus.program.account.rule.fetch(rulePDA);
       // This part is only executed if Rule already exists:
       flashMsg(
         <div>
@@ -318,19 +297,12 @@ export default function Home() {
     } catch (e) {
       try {
         // Add new rule:
-        await solCerberus.program.methods
-          .addRule({
-            namespace: namespaces.Default,
-            role: newRule.role,
-            resource: newRule.resource,
-            permission: newRule.permission,
-            expiresAt: null,
-          })
-          .accounts({
-            app: pdas.scAppPda,
-            rule: rulePda,
-          })
-          .rpc();
+        await solCerberus.addRule(
+          newRule.role,
+          newRule.resource,
+          newRule.permission
+        );
+
         flashMsg(
           <div>
             Created new permission:{" "}
@@ -376,19 +348,7 @@ export default function Home() {
   ) => {
     setModals({ ...modals, main: false });
     try {
-      await solCerberus.program.methods
-        .deleteRule()
-        .accounts({
-          app: pdas.scAppPda,
-          rule: await sc_rule_pda(
-            solCerberus.appId,
-            role,
-            resource,
-            permission
-          ),
-          collector: publicKey,
-        })
-        .rpc();
+      await solCerberus.deleteRule(role, resource, permission);
       flashMsg(
         <div>
           Deleted permission:{" "}
@@ -534,7 +494,11 @@ export default function Home() {
 
   const handleUpdatedRoles = async () => {
     if (!solCerberusRef.current || !demoRef.current) return;
-    setAllAssignedRoles(await solCerberusRef.current.fetchAssignedRoles());
+    setAllAssignedRoles(
+      (await solCerberusRef.current.fetchAllRoles({
+        groupBy: rolesGroupedBy.Role,
+      })) as RolesByAddressType
+    );
   };
 
   const initAccounts = async (appIdStr: string) => {
@@ -552,7 +516,7 @@ export default function Home() {
       });
       setSolCerberus(sc);
       [scAppPda, demoPda] = (
-        await Promise.allSettled([sc_app_pda(scAppId), demo_pda(scAppId)])
+        await Promise.allSettled([appPda(scAppId), demo_pda(scAppId)])
       )
         .filter((r: any) => r.status === "fulfilled")
         .map((r: any) => r.value);
@@ -565,7 +529,11 @@ export default function Home() {
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
     setPermissions(await sc.fetchPerms());
-    setAllAssignedRoles(await sc.fetchAssignedRoles());
+    setAllAssignedRoles(
+      (await solCerberusRef.current.fetchAllRoles({
+        groupBy: rolesGroupedBy.Role,
+      })) as RolesByAddressType
+    );
     setMetaplex(new Metaplex(connection));
     try {
       await refreshDemo(demoProg, demoPda);
@@ -636,7 +604,12 @@ export default function Home() {
           allMyRoles[role][address] = values;
           // Add NFT mint address if authenticating via collection
           if (values.addressType === "collection") {
-            allMyRoles[role][address].nftMint = collectionMintsMap[address];
+            if (!allMyRoles[role][address].nftMints) {
+              allMyRoles[role][address].nftMints = [];
+            }
+            allMyRoles[role][address].nftMints.push(
+              collectionMintsMap[address]
+            );
           }
         });
       }
@@ -654,7 +627,7 @@ export default function Home() {
       await demoProgram.methods[`add${resource}`](color, size)
         .accounts({
           demo: pdas.demoPda,
-          ...(await solCerberus.accounts(myRoles, resource, "Add")),
+          ...(await solCerberus.accounts(resource, "Add")),
         })
         .rpc();
       flashMsg(`Added ${resource}`, "success");
@@ -676,7 +649,7 @@ export default function Home() {
       await demoProgram.methods[`update${resource}`](color, size)
         .accounts({
           demo: pdas.demoPda,
-          ...(await solCerberus.accounts(myRoles, resource, "Update")),
+          ...(await solCerberus.accounts(resource, "Update")),
         })
         .rpc();
       flashMsg(`Updated ${resource}`, "success");
@@ -694,7 +667,7 @@ export default function Home() {
       await demoProgram.methods[`delete${resource}`]()
         .accounts({
           demo: pdas.demoPda,
-          ...(await solCerberus.accounts(myRoles, resource, "Delete")),
+          ...(await solCerberus.accounts(resource, "Delete")),
         })
         .rpc();
       flashMsg(`Deleted ${resource}`, "success");
@@ -1062,98 +1035,97 @@ export default function Home() {
                   </thead>
                   <tbody>
                     <AnimatePresence>
-                      {!!Object.keys(permissions.perms).length &&
-                        Object.entries(
-                          permissions.perms[namespaces.Default]
-                        ).map(([role, resources], k0: number) =>
-                          Object.entries(resources).map(
-                            ([resource, permissions], k1: number) =>
-                              Object.entries(permissions).map(
-                                ([permission, data], k2: number) => (
-                                  <motion.tr
-                                    key={`perm-${k0}${k1}${k2}`}
-                                    {...DEFAULT_ANIMATION}
-                                  >
-                                    <td>
-                                      <strong className={role}>{role}</strong>
-                                    </td>
-                                    <td className={`${resource}Master`}>
-                                      {resource}
-                                    </td>
-                                    <td>{permission}</td>
-                                    <td>
-                                      {isAdmin() && (
-                                        <Icon
-                                          cType="close"
-                                          width={10}
-                                          height={10}
-                                          className="icon2"
-                                          onClick={() =>
-                                            setMainModalContent(
-                                              <>
-                                                <h3>Delete permission</h3>
-                                                <p className="mb-med">
-                                                  Do you really want to delete
-                                                  the permission:{" "}
-                                                </p>
-                                                <p className="mb-big">
-                                                  <span className="aligned gap5">
-                                                    <strong className={role}>
-                                                      {role}
-                                                    </strong>
-                                                    <Icon
-                                                      cType="chevron"
-                                                      direction="right"
-                                                    />
-                                                    <strong
-                                                      className={`${resource}Master`}
+                      {!!Object.keys(permissions).length &&
+                        Object.entries(permissions[namespaces.Rule]).map(
+                          ([role, resources], k0: number) =>
+                            Object.entries(resources).map(
+                              ([resource, permissions], k1: number) =>
+                                Object.entries(permissions).map(
+                                  ([permission, data], k2: number) => (
+                                    <motion.tr
+                                      key={`perm-${k0}${k1}${k2}`}
+                                      {...DEFAULT_ANIMATION}
+                                    >
+                                      <td>
+                                        <strong className={role}>{role}</strong>
+                                      </td>
+                                      <td className={`${resource}Master`}>
+                                        {resource}
+                                      </td>
+                                      <td>{permission}</td>
+                                      <td>
+                                        {isAdmin() && (
+                                          <Icon
+                                            cType="close"
+                                            width={10}
+                                            height={10}
+                                            className="icon2"
+                                            onClick={() =>
+                                              setMainModalContent(
+                                                <>
+                                                  <h3>Delete permission</h3>
+                                                  <p className="mb-med">
+                                                    Do you really want to delete
+                                                    the permission:{" "}
+                                                  </p>
+                                                  <p className="mb-big">
+                                                    <span className="aligned gap5">
+                                                      <strong className={role}>
+                                                        {role}
+                                                      </strong>
+                                                      <Icon
+                                                        cType="chevron"
+                                                        direction="right"
+                                                      />
+                                                      <strong
+                                                        className={`${resource}Master`}
+                                                      >
+                                                        {resource}
+                                                      </strong>
+                                                      <Icon
+                                                        cType="chevron"
+                                                        direction="right"
+                                                      />
+                                                      <strong>
+                                                        {permission}
+                                                      </strong>
+                                                    </span>
+                                                  </p>
+                                                  <div className="aligned centered">
+                                                    <Button
+                                                      className="button2"
+                                                      onClick={() =>
+                                                        handleDeleteRule(
+                                                          role,
+                                                          resource,
+                                                          permission
+                                                        )
+                                                      }
                                                     >
-                                                      {resource}
-                                                    </strong>
-                                                    <Icon
-                                                      cType="chevron"
-                                                      direction="right"
-                                                    />
-                                                    <strong>
-                                                      {permission}
-                                                    </strong>
-                                                  </span>
-                                                </p>
-                                                <div className="aligned centered">
-                                                  <Button
-                                                    className="button2"
-                                                    onClick={() =>
-                                                      handleDeleteRule(
-                                                        role,
-                                                        resource,
-                                                        permission
-                                                      )
-                                                    }
-                                                  >
-                                                    Delete
-                                                  </Button>
-                                                  <Button
-                                                    className="button1"
-                                                    onClick={() =>
-                                                      setModals({
-                                                        ...modals,
-                                                        main: false,
-                                                      })
-                                                    }
-                                                  >
-                                                    Cancel
-                                                  </Button>
-                                                </div>
-                                              </>
-                                            )
-                                          }
-                                        />
-                                      )}
-                                    </td>
-                                  </motion.tr>
+                                                      Delete
+                                                    </Button>
+                                                    <Button
+                                                      className="button1"
+                                                      onClick={() =>
+                                                        setModals({
+                                                          ...modals,
+                                                          main: false,
+                                                        })
+                                                      }
+                                                    >
+                                                      Cancel
+                                                    </Button>
+                                                  </div>
+                                                </>
+                                              )
+                                            }
+                                          />
+                                        )}
+                                      </td>
+                                    </motion.tr>
+                                  )
                                 )
-                              )
-                          )
+                            )
                         )}
                     </AnimatePresence>
                   </tbody>
@@ -1209,7 +1181,7 @@ export default function Home() {
                           </Button>
                           <Tooltip id={`addBtn-${resource}`} />
                         </div>
-                        {solCerberus.hasPerm(myRoles, resource, "Add") ? (
+                        {solCerberus.hasPerm(resource, "Add") ? (
                           <span>
                             <Icon
                               cType="valid"
@@ -1260,7 +1232,7 @@ export default function Home() {
                           </Button>
                           <Tooltip id={`updateBtn-${resource}`} />
                         </div>
-                        {solCerberus.hasPerm(myRoles, resource, "Update") ? (
+                        {solCerberus.hasPerm(resource, "Update") ? (
                           <span>
                             <Icon
                               cType="valid"
@@ -1332,7 +1304,7 @@ export default function Home() {
                           </Button>
                           <Tooltip id={`deleteBtn-${resource}`} />
                         </div>
-                        {solCerberus.hasPerm(myRoles, resource, "Delete") ? (
+                        {solCerberus.hasPerm(resource, "Delete") ? (
                           <span>
                             <Icon
                               cType="valid"
@@ -1511,9 +1483,9 @@ export default function Home() {
                     placeholder="Select type.."
                     name="type"
                     options={[
-                      { value: "Wallet", label: "Wallet" },
-                      { value: "NFT", label: "NFT" },
-                      { value: "Collection", label: "Collection" },
+                      { value: "wallet", label: "Wallet" },
+                      { value: "nft", label: "NFT" },
+                      { value: "collection", label: "Collection" },
                     ]}
                     value={
                       assignRole.type
