@@ -1,4 +1,4 @@
-import { WalletError } from "@solana/wallet-adapter-base";
+import { WalletAdapterNetwork, WalletError } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   ConnectionProvider,
@@ -6,6 +6,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import {
   LedgerWalletAdapter,
+  PhantomWalletAdapter,
   SlopeWalletAdapter,
   SolflareWalletAdapter,
   SolletExtensionWalletAdapter,
@@ -16,14 +17,17 @@ import { FC, ReactNode, useCallback, useMemo } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { Notification } from "../notification";
 import { SettingsProvider } from "./settings";
+import { getClusterRPC } from "../utils/helpers";
 
-const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK as any;
-  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_HOST as string;
+const WalletContextProvider: FC<{
+  cluster: WalletAdapterNetwork;
+  children: ReactNode;
+}> = ({ cluster, children }) => {
+  const network = cluster;
 
   const wallets: any = useMemo(
     () => [
-      // new PhantomWalletAdapter(),
+      new PhantomWalletAdapter(),
       new SlopeWalletAdapter(),
       new SolflareWalletAdapter(),
       new LedgerWalletAdapter(),
@@ -52,7 +56,7 @@ const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
   );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={getClusterRPC(cluster)}>
       <WalletProvider wallets={wallets} onError={onError} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
@@ -60,9 +64,12 @@ const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
   );
 };
 
-export const ContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
+export const ContextProvider: FC<{
+  cluster: WalletAdapterNetwork;
+  children: ReactNode;
+}> = ({ cluster, children }) => {
   return (
-    <WalletContextProvider>
+    <WalletContextProvider cluster={cluster}>
       <Toaster />
       <SettingsProvider>{children}</SettingsProvider>
     </WalletContextProvider>

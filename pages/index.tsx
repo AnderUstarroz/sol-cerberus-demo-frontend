@@ -5,7 +5,7 @@ import styles from "../styles/Home.module.scss";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { DEFAULT_ANIMATION } from "../components/utils/animation";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { SolCerberusDemo } from "../sol_cerberus_demo";
 import { Metaplex, FindNftsByOwnerOutput } from "@metaplex-foundation/js";
 import { useRouter } from "next/router";
@@ -22,16 +22,22 @@ import {
   appPda,
   rolePda,
   rulePda,
-  short_key,
+  shortKey,
   RolesByAddressType,
   namespaces,
   SolCerberus,
   AddressByRoleType,
   CachedPermsType,
-  rolesGroupedBy,
   addressTypes,
+  NFTAddressType,
+  CollectionAddressType,
 } from "sol-cerberus-js";
-import { LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   ErrorType,
   AssignRoleType,
@@ -61,22 +67,19 @@ const Button = dynamic(() => import("../components/button"));
 const ResourceForm = dynamic(() => import("../components/resource-form"));
 const Checkbox = dynamic(() => import("../components/checkbox"));
 
-export default function Home() {
+export default function Home({ cluster }) {
   const { publicKey, wallet, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const router = useRouter();
   const [demoProgram, setDemoProgram] =
     useState<anchor.Program<SolCerberusDemo> | null>(null);
   const [solCerberus, setSolCerberus] = useState<SolCerberus | null>(null);
-  const solCerberusRef = useRef(solCerberus);
-  solCerberusRef.current = solCerberus;
   const [permissions, setPermissions] = useState<CachedPermsType>({});
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [demo, setDemo] = useState<DemoType | null>(null);
-  const demoRef = useRef(demo);
-  demoRef.current = demo;
   const [rotateShape, setRotateShape] = useState<boolean>(false);
+  const [appChanged, setAppChanged] = useState<Date>(new Date());
   const [assignRole, setAssignRole] = useState<AssignRoleType>({
     role: null,
     address: "",
@@ -135,7 +138,7 @@ export default function Home() {
       flashMsg(
         <div>
           The role <strong>{assignRole.role}</strong> is already assigned to{" "}
-          {short_key(assignRole.address)}
+          {shortKey(assignRole.address)}
         </div>
       );
       // Fetching the Role PDA should normally fail because is not supposed to exist yet:
@@ -154,7 +157,7 @@ export default function Home() {
         flashMsg(
           <div>
             Assigned role <strong>{assignRole.role}</strong> to{" "}
-            {short_key(assignRole.address)}
+            {shortKey(assignRole.address)}
           </div>,
           "success"
         );
@@ -163,7 +166,7 @@ export default function Home() {
         flashMsg(
           `Failed to assign role ${assignRole.role} to ${
             assignRole.type
-          } ${short_key(address)}`
+          } ${shortKey(address)}`
         );
       }
     }
@@ -189,7 +192,7 @@ export default function Home() {
 
       flashMsg(
         <div>
-          Deleted role <strong>{role}</strong> from {type} {short_key(address)}
+          Deleted role <strong>{role}</strong> from {type} {shortKey(address)}
         </div>,
         "success"
       );
@@ -198,7 +201,7 @@ export default function Home() {
       flashMsg(
         <div>
           Failed to delete role <strong>{role}</strong> from {type}{" "}
-          {short_key(address)}
+          {shortKey(address)}
         </div>
       );
     }
@@ -397,7 +400,7 @@ export default function Home() {
     return (
       <>
         <span className="capitalize">{assignedData.addressType}</span> (
-        <strong>{short_key(address)}</strong>)
+        <strong>{shortKey(address)}</strong>)
       </>
     );
   };
@@ -407,7 +410,7 @@ export default function Home() {
    *  and come back connecting with a diferent wallet.
    */
   const setDefaultApp = async (defaultDemo: DemoType) => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       "DefaultSolCerberusAPP",
       defaultDemo.authority.toBase58()
     );
@@ -418,18 +421,10 @@ export default function Home() {
     const transaction = new Transaction(latestBlockHash);
     transaction.feePayer = publicKey;
     transaction.add(
-      await solCerberus.program.methods
-        .initializeApp({
-          id: solCerberus.appId,
-          recovery: null,
-          name: "SolCerberusDemo",
-          cached: false,
-        })
-        .accounts({
-          app: pdas.scAppPda,
-          authority: publicKey,
-        })
-        .instruction()
+      (await solCerberus.initializeApp("SolCerberusDemo", null, {
+        getIx: true,
+        cached: true,
+      })) as TransactionInstruction
     );
     transaction.add(
       await demoProgram.methods
@@ -445,8 +440,8 @@ export default function Home() {
     //    "SquareMaster"    -> "Square"   -> [Add", "Update", "Delete"]
     //    "CircleMaster"    -> "Circle"   -> [Add", "Update", "Delete"]
     //    "TriangleMaster"  -> "Triangle" -> [Add", "Update", "Delete"]
-    (await add_rules_instructions(solCerberus, publicKey, pdas.scAppPda)).map(
-      (r: any) => transaction.add(r.value)
+    (await add_rules_instructions(solCerberus)).map((r: any) =>
+      transaction.add(r.value)
     );
 
     // Check if user has enough balance
@@ -487,20 +482,6 @@ export default function Home() {
     setDemo(defaultApp);
   };
 
-  const handleUpdatedRules = async () => {
-    if (!solCerberusRef.current || !demoRef.current) return;
-    setPermissions(await solCerberusRef.current.fetchPerms());
-  };
-
-  const handleUpdatedRoles = async () => {
-    if (!solCerberusRef.current || !demoRef.current) return;
-    setAllAssignedRoles(
-      (await solCerberusRef.current.fetchAllRoles({
-        groupBy: rolesGroupedBy.Role,
-      })) as RolesByAddressType
-    );
-  };
-
   const initAccounts = async (appIdStr: string) => {
     setLoading(true);
     const provider: anchor.Provider = get_provider(connection, wallet);
@@ -510,9 +491,9 @@ export default function Home() {
     let demoPda: PublicKey;
     try {
       scAppId = new PublicKey(appIdStr);
-      sc = new SolCerberus(scAppId, provider, {
-        rulesChangedCallback: handleUpdatedRules,
-        rolesChangedCallback: handleUpdatedRoles,
+      sc = new SolCerberus(connection, wallet, {
+        appId: scAppId,
+        appChangedCallback: async () => setAppChanged(new Date()),
       });
       setSolCerberus(sc);
       [scAppPda, demoPda] = (
@@ -529,11 +510,7 @@ export default function Home() {
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
     setPermissions(await sc.fetchPerms());
-    setAllAssignedRoles(
-      (await solCerberusRef.current.fetchAllRoles({
-        groupBy: rolesGroupedBy.Role,
-      })) as RolesByAddressType
-    );
+    setAllAssignedRoles((await sc.fetchAllRoles()) as RolesByAddressType);
     setMetaplex(new Metaplex(connection));
     try {
       await refreshDemo(demoProg, demoPda);
@@ -548,7 +525,7 @@ export default function Home() {
   };
 
   const clearAccounts = () => {
-    solCerberus.destroy();
+    solCerberus.disconnect();
     setPdas({ scAppPda: null, demoPda: null });
     setDemoProgram(null);
     setDemo(null);
@@ -570,7 +547,8 @@ export default function Home() {
     // No need to fetch roles for admin
     if (isAdmin()) return;
     let allMyRoles: AddressByRoleType = {};
-    // Add Wallet's roles
+    let myNfts: [NFTAddressType, CollectionAddressType][] = [];
+    // Add my Wallet's address
     let addresses = [publicKey.toBase58()];
     // Add NFT and Collection roles
     const allNFTs: FindNftsByOwnerOutput = await metaplex
@@ -580,19 +558,27 @@ export default function Home() {
     // otherwise we wouldn't know which NFT was authorized for having an allowed collection.
     const collectionMintsMap = {};
     allNFTs.map((nft) => {
+      let nftMint: PublicKey = null;
       // Check if specific NFT has roles assigned
       if (nft.hasOwnProperty("mintAddress")) {
         // @ts-ignore
-        addresses.push(nft.mintAddress.toBase58());
+        nftMint = nft.mintAddress;
       } else if (nft.hasOwnProperty("mint")) {
         // @ts-ignore
-        addresses.push(nft.mint.address.toBase58());
+        nftMint = nft.mint.address;
       }
       // Check if the NFT Collection has roles assigned
-      if (nft.hasOwnProperty("collection") && nft.collection) {
-        // @ts-ignore
-        addresses.push(nft.collection.address.toBase58()); // @ts-ignore
-        collectionMintsMap[nft.collection.address.toBase58()] = nft.mintAddress;
+      if (nftMint) {
+        let collectionMint = null;
+        if (nft.hasOwnProperty("collection") && nft.collection) {
+          collectionMint = nft.collection.address;
+          // @ts-ignore
+          addresses.push(collectionMint.toBase58()); // @ts-ignore
+          collectionMintsMap[collectionMint.toBase58()] = nftMint;
+        }
+
+        addresses.push(nftMint.toBase58());
+        myNfts.push([nftMint, collectionMint ?? nftMint]);
       }
     });
     for (const address of addresses) {
@@ -614,6 +600,8 @@ export default function Home() {
         });
       }
     }
+    // Login using NFTs so user can get the roles assigned to his NFTs or collections.
+    await solCerberus.login({ nfts: myNfts });
     setMyRoles(allMyRoles);
   };
 
@@ -681,14 +669,18 @@ export default function Home() {
 
   // STEP 1 - Initialize Demo
   useEffect(() => {
-    if (!publicKey) {
+    // Clear states when changed Wallet or disconnected
+    if (
+      !publicKey ||
+      (solCerberus && solCerberus.wallet.toBase58() != publicKey.toBase58())
+    ) {
       // Clear all data when user's wallet has been disconnected
       if (solCerberus) {
         clearAccounts();
       }
       return;
     }
-    if (solCerberus) return;
+    if (!router.isReady || solCerberus) return;
     // Get APP ID from query param or generate one from our wallet
     let appId = router.query.id
       ? (router.query.id as string)
@@ -704,10 +696,10 @@ export default function Home() {
     })();
     return () => {
       if (solCerberus) {
-        solCerberus.destroy();
+        solCerberus.disconnect();
       }
     };
-  }, [publicKey, solCerberus]);
+  }, [router.isReady, publicKey, solCerberus]);
 
   // STEP 2 - Obtain all roles assigned to my Wallet, NFTs or collections whenever roles change
   useEffect(() => {
@@ -734,11 +726,7 @@ export default function Home() {
     if (!demoProgram || !pdas) return;
     let demoWebsocket = connection.onAccountChange(
       pdas.demoPda,
-      (_updatedAccountInfo: any, _context: any) => {
-        refreshDemo(demoProgram, pdas.demoPda);
-        // console.log("Demo updated:", updatedAccountInfo);
-        // console.log("context:", context);
-      },
+      (_: any, _context: any) => refreshDemo(demoProgram, pdas.demoPda),
       "confirmed"
     );
     return () => {
@@ -750,6 +738,18 @@ export default function Home() {
   useEffect(() => {
     setRotateShape(!rotateShape);
   }, [demo]);
+
+  // Refreshes Roles or Rules whenever the SC APP is updated.
+  useEffect(() => {
+    if (!solCerberus || !demo) return;
+    (async () => {
+      solCerberus.appData.rolesUpdatedAt > solCerberus.appData.rulesUpdatedAt
+        ? setAllAssignedRoles(
+            (await solCerberus.fetchAllRoles()) as RolesByAddressType
+          )
+        : setPermissions(await solCerberus.fetchPerms());
+    })();
+  }, [appChanged]);
 
   return (
     <>
@@ -810,14 +810,16 @@ export default function Home() {
                 <p>
                   Initially each one of these roles can control just his
                   corresponding resource, but you can modify the permissions
-                  however you like. This demo{" "}
-                  <strong>only works on Devnet</strong>, remember to choose the
-                  devnet network in your Solana wallet.
+                  however you like. Try assigning some roles to different
+                  wallets or NFTs, then disconnect and connect with them to test
+                  them out.
                 </p>
+                <h3 className="mb-med">Demo only available in Devnet</h3>
                 <p>
-                  Try assigning some roles to different wallets or NFTs, then
-                  disconnect and connect with them to test them out.
+                  This demo <strong>only works on Devnet</strong>. Make sure
+                  your Solana wallet is configured to use the Devnet network.
                 </p>
+
                 <p className={styles.github}>
                   <a
                     className="link aligned gap5"
@@ -845,9 +847,8 @@ export default function Home() {
               <fieldset>
                 <p>
                   Assign roles to wallets, NFTs or to entire NFT collections.
-                  Only Admin wallet (
-                  <strong>{short_key(demo.authority)}</strong>) can modify
-                  roles.
+                  Only Admin wallet (<strong>{shortKey(demo.authority)}</strong>
+                  ) can modify roles.
                 </p>
                 <table>
                   <thead>
@@ -861,7 +862,7 @@ export default function Home() {
                   </thead>
                   <tbody>
                     <motion.tr {...DEFAULT_ANIMATION}>
-                      <td>{short_key(demo.authority)}</td>
+                      <td>{shortKey(demo.authority)}</td>
                       <td>Admin</td>
                       <td>Wallet</td>
                       <td>Never</td>
@@ -877,7 +878,7 @@ export default function Home() {
                                   key={`assign${k0}-${k1}`}
                                   {...DEFAULT_ANIMATION}
                                 >
-                                  <td>{short_key(address)}</td>
+                                  <td>{shortKey(address)}</td>
                                   <td>
                                     <strong className={role}>{role}</strong>
                                   </td>
@@ -928,7 +929,7 @@ export default function Home() {
                                                 </strong>
                                                 :{" "}
                                                 <strong>
-                                                  {short_key(address)}
+                                                  {shortKey(address)}
                                                 </strong>
                                                 ?
                                               </p>
@@ -976,7 +977,7 @@ export default function Home() {
                     <div>
                       <p>
                         Your are currently logged in as <strong>Admin</strong> (
-                        <strong>{short_key(demo.authority)}</strong>) you are
+                        <strong>{shortKey(demo.authority)}</strong>) you are
                         allowed to do everything!
                       </p>
                       <p>
@@ -998,7 +999,7 @@ export default function Home() {
                   ) : (
                     <p>
                       You are connected via wallet{" "}
-                      <strong>{short_key(publicKey)}</strong>, but have no roles
+                      <strong>{shortKey(publicKey)}</strong>, but have no roles
                       assigned.
                     </p>
                   )}
@@ -1020,9 +1021,8 @@ export default function Home() {
               <fieldset>
                 <p>
                   Manage the permissions allowed for each role on each resource.
-                  Only Admin wallet (
-                  <strong>{short_key(demo.authority)}</strong>) can modify
-                  permissions.
+                  Only Admin wallet (<strong>{shortKey(demo.authority)}</strong>
+                  ) can modify permissions.
                 </p>
                 <table>
                   <thead>
@@ -1491,7 +1491,11 @@ export default function Home() {
                       assignRole.type
                         ? {
                             value: assignRole.type,
-                            label: assignRole.type,
+                            label: {
+                              nft: "NFT",
+                              wallet: "Wallet",
+                              collection: "Collection",
+                            }[assignRole.type] as string,
                           }
                         : null
                     }

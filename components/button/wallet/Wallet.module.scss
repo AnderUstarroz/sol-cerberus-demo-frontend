@@ -1,18 +1,11 @@
 .default {
-  background: var(--buttonBg0);
-  border: none;
-  border-radius: 74px;
-  font-size: var(--fontSizeSmall) !important;
-  padding: 0 15px;
-  height: 35px;
-  > i {
-    margin-right: 5px;
-    > img {
-      width: 20px;
-      height: 20px;
+  display: inline-block;
+  & :global {
+    .wallet-adapter-button {
+      font-size: 12px;
+      height: unset;
+      padding: 5px 20px;
+      line-height: unset;
     }
-  }
-  &:hover {
-    background-color: transparent !important;
   }
 }

@@ -33,20 +33,17 @@ export default function HomeMenu({ toggle }: HomeMenuType) {
         </div>
       </MenuItem>
 
-      {/* <MenuItem whileTap={{}} whileHover={{}}>
-        <div className="vAligned gap5">
-          <Button cType="transparent" style={{ paddingBottom: 4 }}>
-            <Link
-              title="Visit Website"
-              href={"/"}
-              target="_blank"
-              onClick={toggle}
-            >
-              <Icon cType="web" height={size} width={size} />
-            </Link>
-          </Button>
-        </div>
-      </MenuItem> */}
+      <MenuItem whileTap={{}} whileHover={{}}>
+        <Button cType="transparent">
+          <Link
+            href="https://solcerberus.com/app"
+            title="SC Manager"
+            onClick={toggle}
+          >
+            SC Manager
+          </Link>
+        </Button>
+      </MenuItem>
       <MenuItem whileTap={{}} whileHover={{}}>
         <Button cType="transparent">
           <Link

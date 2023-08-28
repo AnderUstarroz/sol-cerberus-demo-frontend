@@ -29,6 +29,7 @@ const Icons: IconTypes = {
   notification: dynamic(() => import("./notification")),
   forbidden: dynamic(() => import("./forbidden")),
   github: dynamic(() => import("./github")),
+  antennae: dynamic(() => import("./antennae")),
 };
 
 function Icon({ cType, ...props }: IconType) {

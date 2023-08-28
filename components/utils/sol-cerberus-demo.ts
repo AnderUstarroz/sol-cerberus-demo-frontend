@@ -1,6 +1,5 @@
 import * as anchor from "@project-serum/anchor";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import { sc_rule_pda } from "sol-cerberus-js";
 import DemoIDL from "../../public/idl/sol_cerberus_demo.json";
 import { SolCerberusDemo } from "../../sol_cerberus_demo";
 import { SolCerberus } from "sol-cerberus-js";
@@ -36,40 +35,9 @@ export async function demo_pda(scAppId: PublicKey) {
   )[0];
 }
 
-export async function add_rules_instructions(
-  solCerberus: SolCerberus,
-  publicKey: PublicKey,
-  scAppPda: PublicKey
-) {
+export async function add_rules_instructions(solCerberus: SolCerberus) {
   const roles = ["SquareMaster", "CircleMaster", "TriangleMaster"];
   const perms = ["Add", "Update", "Delete"];
-  // Create rule map
-  const ruleMap = roles.reduce(
-    (acc: [], role: string) => [
-      ...acc,
-      ...perms.map((perm: string) => `${role}${perm}`),
-    ],
-    []
-  );
-  // Create default Rules PDAs for each Role: SquareMaster, CircleMaster, TriangleMaster
-  const rulesPdas = (
-    await Promise.allSettled(
-      roles.reduce(
-        (acc: [], role: string) => [
-          ...acc,
-          ...perms.map((perm: string) =>
-            sc_rule_pda(solCerberus.appId, role, role.slice(0, -6), perm)
-          ),
-        ],
-        []
-      )
-    )
-  )
-    .filter((r: any) => r.status === "fulfilled")
-    .reduce((acc: {}, r: any, k: number) => {
-      acc[ruleMap[k]] = r.value;
-      return acc;
-    }, {});
   // Add each Rule instruction into the transaction:
   return (
     await Promise.allSettled(
@@ -77,26 +45,9 @@ export async function add_rules_instructions(
         return [
           ...acc,
           ...perms.map((perm: string) =>
-            solCerberus.program.methods
-              .addRule({
-                namespace: 0,
-                role: role,
-                resource: role.slice(0, -6),
-                permission: perm,
-                expiresAt: null,
-              })
-              .accounts({
-                rule: rulesPdas[`${role}${perm}`],
-                solCerberusApp: scAppPda,
-                solCerberusRole: null,
-                solCerberusRule: null,
-                solCerberusRule2: null,
-                solCerberusToken: null,
-                solCerberusMetadata: null,
-                solCerberusSeed: null,
-                signer: publicKey,
-              })
-              .instruction()
+            solCerberus.addRule(role, role.slice(0, -6), perm, {
+              getIx: true,
+            })
           ),
         ];
       }, [])

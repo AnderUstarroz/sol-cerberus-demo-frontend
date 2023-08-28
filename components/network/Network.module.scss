@@ -1,0 +1,18 @@
+.network {
+  position: absolute;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+
+  & :global {
+  }
+}
+
+@media (max-width: 1023px) {
+  .network {
+    padding-left: 20px;
+    top: 20px;
+    right: auto;
+  }
+}

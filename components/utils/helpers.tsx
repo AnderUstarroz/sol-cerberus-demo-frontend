@@ -1,6 +1,20 @@
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
 import { ReactNode } from "react";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+
+export const clusters: WalletAdapterNetwork[] = [
+  WalletAdapterNetwork.Devnet,
+  WalletAdapterNetwork.Testnet,
+  WalletAdapterNetwork.Mainnet,
+];
+
+export const getClusterRPC = (cluster: WalletAdapterNetwork) =>
+  ({
+    [WalletAdapterNetwork.Devnet]: process.env.NEXT_PUBLIC_DEVNET_RPC_HOST,
+    [WalletAdapterNetwork.Testnet]: process.env.NEXT_PUBLIC_TESTNET_RPC_HOST,
+    [WalletAdapterNetwork.Mainnet]: process.env.NEXT_PUBLIC_MAINNET_RPC_HOST,
+  }[cluster]);
 
 const Notification = dynamic(() => import("../notification"));
 

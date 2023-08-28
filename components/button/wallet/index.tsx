@@ -24,11 +24,9 @@ export const DisconnectButton = ({ onClick }: DisconnectButtonType) => {
 
 const Wallet: FC = (props: any) => {
   return (
-    <WalletMultiButton
-      className={
-        (props.className ? `${props.className} ` : "") + styles.default
-      }
-    />
+    <div className={`${props.className ?? ""} ${styles.default}`}>
+      <WalletMultiButton />
+    </div>
   );
 };
 

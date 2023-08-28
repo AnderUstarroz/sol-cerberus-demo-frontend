@@ -1,0 +1,30 @@
+.icon {
+  position: relative;
+  & :global {
+    .signal {
+      position: absolute;
+      top: -1px;
+      left: -5px;
+      width: 24px;
+      height: 24px;
+      display: inline-block;
+    }
+    .signal::after,
+    .signal::before {
+      opacity: 0;
+      content: "";
+      box-sizing: border-box;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      position: absolute;
+      left: 0;
+      top: 0;
+      animation: signalEffect 2s linear infinite;
+    }
+    .signal::after {
+      animation-delay: 1s;
+    }
+  }
+}
