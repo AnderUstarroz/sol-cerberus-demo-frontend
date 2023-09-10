@@ -7,11 +7,7 @@ import {
 import {
   LedgerWalletAdapter,
   PhantomWalletAdapter,
-  SlopeWalletAdapter,
   SolflareWalletAdapter,
-  SolletExtensionWalletAdapter,
-  SolletWalletAdapter,
-  //   TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { FC, ReactNode, useCallback, useMemo } from "react";
 import toast, { Toaster } from "react-hot-toast";
@@ -23,19 +19,13 @@ const WalletContextProvider: FC<{
   cluster: WalletAdapterNetwork;
   children: ReactNode;
 }> = ({ cluster, children }) => {
-  const network = cluster;
-
   const wallets: any = useMemo(
     () => [
       new PhantomWalletAdapter(),
-      new SlopeWalletAdapter(),
       new SolflareWalletAdapter(),
       new LedgerWalletAdapter(),
-      new SolletWalletAdapter({ network }),
-      new SolletExtensionWalletAdapter({ network }),
-      // new TorusWalletAdapter(),
     ],
-    [network]
+    [cluster]
   );
 
   const onError = useCallback(

@@ -443,13 +443,12 @@ export default function Home({ cluster }) {
     (await add_rules_instructions(solCerberus)).map((r: any) =>
       transaction.add(r.value)
     );
-
     // Check if user has enough balance
     const [balance, rentCost, txFee] = await get_balances(
       connection,
       publicKey,
       transaction,
-      112 + 126 + 119 * 9 // Required account space
+      112 + 162 + 111 * 9 // Required account space (Demo: 112, SC APP: 162, SC Rule: 111 each)
     );
     const totalCost = txFee + rentCost;
     if (totalCost > balance) {
@@ -506,21 +505,23 @@ export default function Home({ cluster }) {
       console.error(`Invalid APP ID ${appIdStr}`);
       return (window.location.href = "/");
     }
+    const appData = await sc.fetchAppData();
     const demoProg = get_demo_program(provider);
     setPdas({ scAppPda: scAppPda, demoPda: demoPda });
     setDemoProgram(demoProg);
-    setPermissions(await sc.fetchPerms());
-    setAllAssignedRoles((await sc.fetchAllRoles()) as RolesByAddressType);
-    setMetaplex(new Metaplex(connection));
-    try {
-      await refreshDemo(demoProg, demoPda);
-    } catch (e) {
-      if (appIdStr !== myAppId(publicKey)) {
-        console.error(`Invalid APP ID ${appIdStr}`);
-        return (window.location.href = "/");
+    if (appData) {
+      setPermissions(await sc.fetchPerms());
+      setAllAssignedRoles((await sc.fetchAllRoles()) as RolesByAddressType);
+      setMetaplex(new Metaplex(connection));
+      try {
+        await refreshDemo(demoProg, demoPda);
+      } catch (e) {
+        if (appIdStr !== myAppId(publicKey)) {
+          console.error(`Invalid APP ID ${appIdStr}`);
+          return (window.location.href = "/");
+        }
       }
     }
-
     setLoading(false);
   };
 

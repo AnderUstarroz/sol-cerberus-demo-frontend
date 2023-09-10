@@ -41,16 +41,18 @@ export async function add_rules_instructions(solCerberus: SolCerberus) {
   // Add each Rule instruction into the transaction:
   return (
     await Promise.allSettled(
-      roles.reduce((acc: [], role: string) => {
-        return [
-          ...acc,
-          ...perms.map((perm: string) =>
-            solCerberus.addRule(role, role.slice(0, -6), perm, {
-              getIx: true,
-            })
-          ),
-        ];
-      }, [])
+      roles
+        .reduce((acc: [], role: string) => {
+          return [
+            ...acc,
+            ...perms.map((perm: string) =>
+              solCerberus.addRule(role, role.slice(0, -6), perm, {
+                getIx: true,
+              })
+            ),
+          ];
+        }, [])
+        .slice(0, -1) // @TODO suddenly the transaction is too big and needed to remove last IX
     )
   ).filter((r: any) => r.status === "fulfilled");
 }
