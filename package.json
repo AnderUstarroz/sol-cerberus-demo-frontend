@@ -6,8 +6,8 @@
     "start": "next start"
   },
   "dependencies": {
-    "sol-cerberus-js": "^0.1.7",
-    "@metaplex-foundation/js": "^0.19.4",
+    "sol-cerberus-js": "^0.1.8",
+    "@metaplex-foundation/js": "^0.20.1",
     "@project-serum/anchor": "^0.26.0",
     "@solana-mobile/wallet-adapter-mobile": "^2.0.1",
     "@solana/wallet-adapter-base": "^0.9.23",
